@@ -1034,6 +1034,23 @@ When returning to the root-override form, OpenCodex retains an existing `[model_
 
 Enabling the integration in its provider-table form on a home whose `openai`-tagged conversations Codex has already paginated used to be refused outright with `history_paginated_openai_requires_native_writer`: nothing was written and the integration stayed disabled. OpenCodex now completes that transition by keeping the managed root `openai_base_url` override beside the `[model_providers.opencodex]` table. Codex merges the override onto its built-in `openai` provider, so those conversations keep reaching the proxy without being relabeled and no rollout byte or thread row is touched. Only a routing form that requires the `x-opencodex-api-key` admission header still refuses, because Codex's built-in provider cannot carry that header; its message names the two settings that resolve it — route Codex through the loopback listener so the override can be retained, or set `syncResumeHistory` to `false` to accept that those conversations resume against Codex's own OpenAI endpoint.
 
+### Remote thread-list provider filters
+
+Provider-table routing changes the default provider id for new conversations to `opencodex` while
+history that cannot safely be relabeled may remain tagged `openai`. Some native app-server/mobile
+versions treat an omitted `thread/list.modelProviders` filter as the current default provider only,
+so those existing conversations can disappear from that remote list even though their database row
+and rollout are intact. A compatible list client can send `modelProviders: []` to request all
+providers. OpenCodex cannot rewrite that RPC because the remote client talks directly to Codex's
+native app-server rather than the inference proxy.
+
+`ocx sync` and `ocx start` warn after they successfully select a provider-table route, and the
+dashboard shows the same limitation once either the authless Desktop or client-compaction switch is
+enabled. It appears once even when both preferences are stored. A user-owned root URL that prevents
+OpenCodex routing does not produce the warning. The warning is not a migration: OpenCodex does not edit provider tags merely to influence a
+client-side list filter. Verify the conversation in native Codex and the app-server/client version;
+do not rewrite paginated history to make a remote list include it.
+
 Do not rewrite an active paginated rollout or thread row to migrate those conversations yourself. Close the affected conversation before any recovery, and report the exact error and versions without uploading private history. A backup or a successful script alone does not prove the conversation is visible again. Check the restored conversation in Codex after reopening.
 
 ## Experimental native mid-turn steering
