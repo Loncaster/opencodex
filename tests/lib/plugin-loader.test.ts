@@ -151,6 +151,14 @@ test("recorded macOS ls output rejects effective non-owner write grants", () => 
   ]) {
     expect(macAclListingTrustError(listing)).toBe("has an access control list");
   }
+  // Bare principals are not identity-bearing user records. Keep the rights policy explicit so a
+  // future parser cleanup cannot accidentally grant them the owner/current-user exemption.
+  const bareBenignPrincipal = "-rw-------@ 1 runner staff 64 Sep 27 07:50 /plugins/plugin.ts\n"
+    + " 0: runner allow read\n";
+  expect(macAclListingTrustError(bareBenignPrincipal)).toBeNull();
+  const bareWritePrincipal = "-rw-------@ 1 runner staff 64 Sep 27 07:50 /plugins/plugin.ts\n"
+    + " 0: runner allow write\n";
+  expect(macAclListingTrustError(bareWritePrincipal)).toBe("has an access control list");
   const numericCurrentUser = "-rw-------@ 1 0 staff 64 Sep 27 07:50 /plugins/plugin.ts\n"
     + " 0: user:0 allow write\n";
   expect(macAclListingTrustError(numericCurrentUser, "0")).toBeNull();
