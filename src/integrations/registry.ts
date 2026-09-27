@@ -14,6 +14,9 @@ import {
   ClientPathError,
   clineConfigPath,
   clineSettingsDir,
+  droidConfigPath,
+  droidHomeDir,
+  assertDroidSettingsUnambiguous,
   EXPORT_CLIENTS,
   asideAccountDir,
   asideConfigPath,
@@ -344,6 +347,17 @@ export const INTEGRATION_CLIENTS: Record<IntegrationClientId, IntegrationClientS
     configPath: (env = process.env, home = homedir()) => clineConfigPath(env, home),
     detectDir: (env = process.env, home = homedir()) => clineSettingsDir(env, home),
     writerLock: { suffix: ".lock" },
+  },
+  droid: {
+    id: "droid",
+    configPath: (env = process.env, home = homedir()) => droidConfigPath(env, home),
+    detectDir: (env = process.env, home = homedir()) => droidHomeDir(env, home),
+    resolvePaths: (env = process.env, home = homedir()) => {
+      const detectDir = droidHomeDir(env, home);
+      try { assertDroidSettingsUnambiguous(detectDir); }
+      catch (error) { throw new ClientPathError((error as Error).message); }
+      return { configPath: droidConfigPath(env, home), detectDir };
+    },
   },
 };
 

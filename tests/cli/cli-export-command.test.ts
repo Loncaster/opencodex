@@ -230,6 +230,22 @@ describe("ocx export --json (accept criterion 1)", () => {
     expect(ids).not.toContain("banned/hidden");
     expect(ids).toEqual(["anthropic/claude-opus-5", "custom/no-context", "gpt-5.6-luna"]);
   });
+
+  test("Droid uses the selected catalog without changing Pi export provenance", async () => {
+    const proxy = fakeProxy();
+    const pi = await run(["--client", "pi", "--json"], { baseUrl: proxy.baseUrl });
+    expect(pi.code).toBe(0);
+    const piRows = JSON.parse(pi.stdout) as { providers: { opencodex: { models: Array<{ id: string }> } } };
+    expect(piRows.providers.opencodex.models.map(row => row.id)).toEqual([
+      "anthropic/claude-opus-5", "custom/no-context", "gpt-5.6-luna",
+    ]);
+    logs = [];
+    const droid = await run(["--client", "droid", "--json"], { baseUrl: proxy.baseUrl });
+    expect(droid.code).toBe(0);
+    const droidRows = JSON.parse(droid.stdout) as { customModels: Array<{ model: string }> };
+    expect(droidRows.customModels.map(row => row.model)).toEqual(piRows.providers.opencodex.models.map(row => row.id));
+    expect(droidRows.customModels.some(row => row.model === "banned/hidden")).toBe(false);
+  });
 });
 
 describe("ocx export human output (accept criterion 2)", () => {

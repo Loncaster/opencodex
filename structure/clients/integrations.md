@@ -39,6 +39,15 @@ parsing and ownership rules below.
 | `src/integrations/mutation-plan.ts` | The shared observation both a preview and a mutation read, and the value-free plan an operator confirms. It owns no IO of its own, takes no lock, and must never import `writer.ts`. |
 | `src/integrations/store.ts` / `journal.ts` | One-root persistence for ownership records, operation history, snapshots, and retention maintenance. |
 
+Factory Droid's explicit integration writes only documented `customModels` rows in
+`~/.factory/settings.json` (`%USERPROFILE%\\.factory\\settings.json` on Windows). Each
+row is addressed by its `model` and loopback `baseUrl`; duplicate matches refuse.
+The builder omits `apiKey` and unsupported metadata. The shared writer snapshots
+prior bytes and refuses changed managed rows or unsafe paths. Resolution refuses
+legacy OpenCodex rows in `config.json` and any `customModels` override in
+`settings.local.json`, because Factory merges those files with personal settings.
+No Droid file is written by detection or on the proxy request path.
+
 ## Cursor installed capability reads
 
 `src/integrations/cursor-effort-table.ts` reads the installed agent bundle through one regular-file
