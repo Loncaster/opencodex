@@ -89,8 +89,9 @@ credential, proxy, installer, or authentication boundary, then inspect
 required CI at the exact new PR
 head before merging. GUI changes need a screenshot in the PR description from
 the separate `pr-assets` branch, never committed to the PR branch. Merge only
-when the new PR head contains the latest `origin/dev`; inspect the new `dev` run
-before the next batch.
+when the new PR head contains the latest `origin/dev`; dispatch `ci.yml` on
+`dev` manually as specified in [090](090_final_ci.md) and inspect its exact
+head before the next batch.
 
 ## Consultation and uncertainty
 

@@ -17,9 +17,15 @@ own new PABCD work phase and ordinary PR.
 ## Acceptance and proof
 
 Fetch latest `origin/dev`; for every lane PR, retain the exact pre-merge PR
-head SHA and required-job run IDs that passed before merge. Separately inspect
-the post-merge `dev` workflow on the integrated commit. Missing, skipped,
-cancelled, pending, failed, and older-head results do not count as passing.
+head SHA and required-job run IDs that passed before merge. `ci.yml` does
+not run on a push to `dev`, so after the merge resolve the integrated `dev`
+commit and explicitly dispatch `gh workflow run ci.yml -R
+lidge-jun/opencodex --ref dev -f lane=all`. Identify the resulting run by
+`workflow_dispatch` event and exact `headSha`, then record its run ID, URL,
+attempt, requested jobs and final conclusions. If `dev` moves before dispatch,
+refresh the head and verify the run covers that newer integrated tree instead
+of claiming evidence for an older SHA. Missing, skipped, cancelled, pending,
+failed, and wrong-head results do not count as passing for requested jobs.
 Compare changed paths
 against other lane overlap in the final report. `git status --short` must
 contain no unaccounted files, and each source PR/issue closure must point to
