@@ -24,6 +24,7 @@ description: Подключайте opencodex к OpenCode, Pi, OMP, Hermes, Open
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | сразу после сохранения — Raycast следит за файлом | нет — только loopback |
 | omo | `~/.omo/agent/models.json` | JSON | в новых сессиях | заглушка для loopback |
 | Cline CLI | `~/.cline/data/settings/providers.json` и соседний `models.json` | пара JSON | после остановки и повторного запуска Cline | заглушка для loopback |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
 
 Создаваемые каталоги включают только модели, включённые в настройках каждого
 провайдера. Это относится и к скачиваемым файлам, и к управляемым интеграциям,
@@ -554,3 +555,7 @@ OpenCodex требует явного `--overwrite-conflict`. Отключени
 Для получения списка моделей приложение использует `GET /v1/models`, а для запросов — `POST /v1/chat/completions`. Запросы проходят через обычную маршрутизацию моделей opencodex, поэтому применяются учётные данные провайдера, OAuth-аккаунты и комбинации моделей, как и для любого другого клиента. Поддерживаемые поля запроса перечислены в [справочнике форматов прокси](/reference/proxy-formats/).
 
 Если приложение сообщает, что моделей нет, проверьте, что Base URL заканчивается на `/v1`, а не на `/v1/chat/completions`, и что `/v1/models` возвращает непустой массив `data`. Если opencodex слушает адрес вне loopback, укажите в поле API key ключ допуска данных (токен из раздела [удалённого доступа](/reference/configuration/server/#remote-access) или созданный в дашборде ключ `ocx_…`). Приложение отправляет его как `Authorization: Bearer`; `/v1/chat/completions` использует его только для допуска к прокси и не пересылает upstream. Подробнее см. [матрицу аутентификации](/reference/proxy-formats/#authentication-matrix).
+
+## Factory Droid
+
+Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).

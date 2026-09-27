@@ -1,10 +1,10 @@
 ---
 title: Integrations
-description: Connect opencodex to OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo and Cline CLI from the dashboard — one switch per client, with a backup taken before every write.
+description: Connect opencodex to OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo, Cline CLI and Factory Droid from the dashboard — one switch per client, with a backup taken before every write.
 ---
 
 The **Integrations** tab writes opencodex's provider block into a client's own config
-file, and removes it again. Fifteen clients work this way, each with a switch:
+file, and removes it again. Sixteen clients work this way, each with a switch:
 
 | Client | Config file | Format | When the change takes effect | Credential |
 |---|---|---|---|---|
@@ -23,6 +23,7 @@ file, and removes it again. Fifteen clients work this way, each with a switch:
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | immediately on save — Raycast watches the file | none — loopback only |
 | omo | `~/.omo/agent/models.json` | JSON | new sessions | loopback placeholder |
 | Cline CLI | `~/.cline/data/settings/providers.json` and sibling `models.json` | JSON pair | after stopping and restarting Cline | loopback placeholder |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | immediately via file watching | none — keyless loopback |
 
 Generated catalogs include only enabled models from each provider selection. This applies to both
 downloads and managed integrations, including Pi and Aside. The management model list still shows
@@ -518,3 +519,19 @@ listens on a non-loopback address, put a data-admission key (the token described
 key) in the app's API key field. The app sends it as `Authorization: Bearer`, which
 `/v1/chat/completions` accepts as proxy admission and never forwards upstream; see the
 [authentication matrix](/reference/proxy-formats/#authentication-matrix).
+
+## Factory Droid
+
+Run Droid once to create `~/.factory`, then explicitly enable this integration with
+`ocx integration client enable --client droid`. OpenCodex adds only documented
+`customModels` entries to your personal `settings.json`, using a keyless local
+Chat Completions endpoint. Choose a row from Droid's `/model` picker. Disable
+removes the managed rows; Undo restores the exact saved file. Other settings and
+custom models remain yours.
+
+Droid also reads legacy `config.json` and local `settings.local.json`. Resolve
+any existing OpenCodex rows in legacy config, or a local `customModels` override,
+before enabling; OpenCodex refuses those ambiguous settings. It also refuses an
+unsafe target or a row edited since apply. The integration is loopback only and
+never copies provider credentials. Factory documents the [BYOK schema](https://docs.factory.ai/model-independence/byok)
+and [personal settings path](https://docs.factory.ai/droid-cli/settings).

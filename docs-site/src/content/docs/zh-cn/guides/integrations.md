@@ -3,7 +3,7 @@ title: 集成
 description: 从仪表盘将 opencodex 连接到 OpenCode、Pi、OMP、Hermes、OpenClaw、Kimi Code、gjc、DeepSeek Harness、MiniMax Code、ZCode、Prime Agent、Aside、Raycast、omo 和 Cline CLI；每个客户端都有独立开关，且每次写入前都会备份。
 ---
 
-**Integrations** 标签页可将 opencodex 的提供商配置块写入客户端自己的配置文件，也可再次移除。以下 15 个客户端都采用这种方式，各有独立开关：
+**Integrations** 标签页可将 opencodex 的提供商配置块写入客户端自己的配置文件，也可再次移除。以下 16 个客户端都采用这种方式，各有独立开关：
 
 | 客户端 | 配置文件 | 格式 | 变更生效时间 | 凭据 |
 |---|---|---|---|---|
@@ -22,6 +22,7 @@ description: 从仪表盘将 opencodex 连接到 OpenCode、Pi、OMP、Hermes、
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 保存后立即生效——Raycast 监视该文件 | 无——仅回环 |
 | omo | `~/.omo/agent/models.json` | JSON | 新会话 | 回环占位符 |
 | Cline CLI | `~/.cline/data/settings/providers.json` 及同目录下的 `models.json` | JSON 文件对 | 停止并重启 Cline 后 | 回环占位符 |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
 
 生成的目录只包含各提供商选择中已启用的模型。下载文件和托管集成都遵循这一规则，Pi 和 Aside 也不例外。管理模型列表仍显示完整阵容，以便启用更多模型。
 
@@ -238,3 +239,7 @@ GitHub Copilot 桌面应用可以将 opencodex 用作兼容 OpenAI 的模型提�
 应用通过 `GET /v1/models` 发现模型，并通过 `POST /v1/chat/completions` 发送请求。这些请求经过 opencodex 的常规模型路由，因此与其他客户端一样会应用提供方凭据、OAuth 账户和组合路由。支持的请求字段见[代理格式参考](/reference/proxy-formats/)。
 
 如果应用提示没有模型，请确认 Base URL 以 `/v1` 结尾，而不是 `/v1/chat/completions`，并确认 `/v1/models` 返回非空的 `data` 数组。如果 opencodex 监听的不是回环地址，请在应用的 API key 字段中填写数据准入密钥（[远程访问](/reference/configuration/server/#remote-access)中说明的令牌，或由仪表盘生成的 `ocx_…` 密钥）。应用会将其作为 `Authorization: Bearer` 发送；`/v1/chat/completions` 仅将其用于代理准入，不会转发到上游。详见[认证矩阵](/reference/proxy-formats/#authentication-matrix)。
+
+## Factory Droid
+
+Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).

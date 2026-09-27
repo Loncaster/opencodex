@@ -22,6 +22,7 @@ description: ダッシュボードから opencodex を OpenCode、Pi、OMP、Her
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 保存後すぐ。Raycast がファイルを監視 | なし。ループバックのみ |
 | omo | `~/.omo/agent/models.json` | JSON | 新しいセッション | ループバック用プレースホルダー |
 | Cline CLI | `~/.cline/data/settings/providers.json` と同階層の `models.json` | JSON のペア | Cline の停止と再起動後 | ループバック用プレースホルダー |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
 
 生成されるカタログには、各プロバイダーの選択で有効なモデルのみが含まれます。これはダウンロードと管理対象の統合の両方に適用され、Pi と Aside も対象です。管理画面のモデル一覧にはすべてのモデルが表示されるため、追加のモデルを有効にできます。
 
@@ -240,3 +241,7 @@ GitHub Copilot デスクトップアプリでは、opencodex を OpenAI 互換�
 アプリはモデルの検出に `GET /v1/models`、リクエストの処理に `POST /v1/chat/completions` を使います。リクエストは opencodex の通常のモデルルーティングを通るため、他のクライアントと同じように、プロバイダーの認証情報、OAuth アカウント、コンボが適用されます。受け付けるリクエストフィールドは[プロキシ形式のリファレンス](/reference/proxy-formats/)を参照してください。
 
 モデルが見つからないと表示される場合は、Base URL が `/v1/chat/completions` ではなく `/v1` で終わっていることと、`/v1/models` が空でない `data` 配列を返すことを確認してください。opencodex がループバック以外のアドレスで待ち受けている場合は、アプリの API key 欄にデータ受け入れキー（[リモートアクセス](/reference/configuration/server/#remote-access)に記載されたトークン、またはダッシュボードで生成した `ocx_…` キー）を入力します。アプリはこれを `Authorization: Bearer` として送信します。`/v1/chat/completions` はこれをプロキシの受け入れ認証にだけ使い、上流には転送しません。詳しくは[認証マトリクス](/reference/proxy-formats/#authentication-matrix)を参照してください。
+
+## Factory Droid
+
+Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).
