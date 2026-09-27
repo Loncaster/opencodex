@@ -42,6 +42,8 @@ parsing and ownership rules below.
 Factory Droid's explicit integration writes only documented `customModels` rows in
 `~/.factory/settings.json` (`%USERPROFILE%\\.factory\\settings.json` on Windows). Each
 row is addressed by its `model` and loopback `baseUrl`; duplicate matches refuse.
+Rows whose model ID cannot be represented by that selector are omitted from both
+the export document and managed fragments.
 The builder omits `apiKey` and unsupported metadata. The shared writer snapshots
 prior bytes and refuses changed managed rows or unsafe paths. `src/integrations/droid-settings.ts` refuses
 legacy `config.json` rows that share the exported endpoint, a generated model ID, or an

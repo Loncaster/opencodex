@@ -27,16 +27,28 @@ export function droidConfigPath(env: OpencodeLaunchEnv = process.env, home: stri
   return isWindowsHome(root) ? win32.join(root, "settings.json") : join(root, "settings.json");
 }
 
-export function buildDroidClientConfig(ctx: ExportContext): DroidGeneratedConfig {
-  return {
-    customModels: normalizeExportModels(ctx.models).map(model => ({
+function buildDroidRows(ctx: ExportContext): Array<{ row: DroidModelEntry; selector: string }> {
+  const rows: Array<{ row: DroidModelEntry; selector: string }> = [];
+  for (const model of normalizeExportModels(ctx.models)) {
+    const selector = formatSelectorConjunction([
+      { field: "model", value: model.namespaced },
+      { field: "baseUrl", value: ctx.baseUrl },
+    ]);
+    // A row we cannot address safely cannot be managed or exported.
+    if (!selector) continue;
+    rows.push({ selector, row: {
       model: model.namespaced,
       displayName: `OpenCodex: ${exportPresentationLabel(model)}`,
       baseUrl: ctx.baseUrl,
-      provider: "generic-chat-completion-api" as const,
+      provider: "generic-chat-completion-api",
       noImageSupport: !model.inputModalities?.includes("image"),
-    })),
-  };
+    } });
+  }
+  return rows;
+}
+
+export function buildDroidClientConfig(ctx: ExportContext): DroidGeneratedConfig {
+  return { customModels: buildDroidRows(ctx).map(({ row }) => row) };
 }
 
 export function summarizeDroid(document: unknown) {
@@ -47,16 +59,8 @@ export function summarizeDroid(document: unknown) {
 }
 
 export function buildDroidContribution(ctx: ExportContext): ManagedContribution {
-  const rows = buildDroidClientConfig(ctx).customModels;
   return {
     clientId: "droid",
-    fragments: rows.map(row => {
-      const selector = formatSelectorConjunction([
-        { field: "model", value: row.model },
-        { field: "baseUrl", value: row.baseUrl },
-      ]);
-      if (!selector) throw new Error("Droid model selector cannot safely represent this model");
-      return { path: ["customModels", selector], value: row };
-    }),
+    fragments: buildDroidRows(ctx).map(({ row, selector }) => ({ path: ["customModels", selector], value: row })),
   };
 }

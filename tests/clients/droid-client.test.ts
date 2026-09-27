@@ -63,6 +63,30 @@ describe("Factory Droid documented personal settings", () => {
     ]);
   });
 
+  test("skips models that cannot be addressed by managed selectors", () => {
+    const models: ExportModel[] = [
+      { namespaced: "mock/a,b", provider: "mock", id: "a,b", inputModalities: ["text"] },
+      { namespaced: "mock/c]d", provider: "mock", id: "c]d", inputModalities: ["text"] },
+      MODELS[1]!,
+    ];
+    const path = install('{"customModels":[]}\n');
+    const input = request(models);
+    expect(readIntegrationState(input).state).toBe("absent");
+    expect(previewIntegration(input, { operation: "apply" })).toMatchObject({ canApply: true, willChange: true });
+    const context = { baseUrl: BASE, models, config: CONFIG };
+    const exported = buildClientConfigText("droid", context);
+    const document = exported.document as DroidGeneratedConfig;
+    const fragments = buildClientContribution("droid", context).fragments;
+    expect(document.customModels.map(row => row.model)).toEqual(["mock/text"]);
+    expect(JSON.parse(exported.text)).toEqual(document);
+    expect(fragments.map(fragment => fragment.value)).toEqual(document.customModels);
+    expect(fragments.map(fragment => fragment.path)).toEqual([
+      ["customModels", `[v2:model=mock/text,baseUrl=${BASE}]`],
+    ]);
+    expect(applyIntegration(input).ok).toBe(true);
+    expect(read(path).customModels.map(row => row.model)).toEqual(["mock/text"]);
+  });
+
   test("resolves macOS and Windows-shaped homes without writing to the real home", () => {
     expect(droidHomeDir({}, home)).toBe(join(home, ".factory"));
     expect(droidConfigPath({}, home)).toBe(join(home, ".factory", "settings.json"));
