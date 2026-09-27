@@ -43,9 +43,13 @@ explicit proxy precedence. `structure/config-proxy.md:1-20` owns the contract.
 
 ## Acceptance and proof
 
-Activation scenario: Darwin with `config.proxy: "auto"`, no inherited scheme
-proxy, and valid system settings sets the proxy and safely representable
-bypass list; inherited lowercase `no_proxy` remains the effective source.
+Activation scenario: Darwin with `config.proxy: "auto"`, no inherited HTTP(S)
+or SOCKS proxy (`ALL_PROXY`/`all_proxy` included), and valid system settings
+sets the proxy and safely representable bypass list. Bypass precedence is
+asserted per transport: Bun's native HTTP(S) fetch reads a non-empty lowercase
+`no_proxy` before `NO_PROXY`, while `resolveProxyRoute` honors an explicitly
+defined uppercase `NO_PROXY`, including an empty value. Tests keep route
+assertions for both transports when the two variables disagree.
 Negative scenarios: unset `config.proxy` never reads system settings or mutates
 egress, inherited HTTP(S) or SOCKS proxy wins without mixed bypass semantics,
 unrepresentable exceptions refuse before any environment write, disabled or
