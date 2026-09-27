@@ -38,7 +38,7 @@ import {
   resolveCodexHistoryJobTarget,
   runCodexHistoryJob,
 } from "../codex/history-job";
-import { reconcileJournal } from "../codex/journal";
+import { findCrossHomeOwner, reconcileStartupJournal } from "./cross-home-owner";
 import { inspectClientRotationRecoveryGate, readClientConnectionState } from "../client/state";
 import {
   codexAutoStartEnabled,
@@ -131,7 +131,7 @@ import {
 } from "./start-ownership-publication";
 import { syncModelsToCodex } from "../codex/sync";
 import { localClientSkipReason, shouldSyncGrokOnStart, syncCodexOnStartIfEnabled } from "../codex/desired-state";
-import { honorSiblingMarker, markSiblingStart, siblingOfLivePort, siblingRuntimeField, siblingStopFoundOwner, withoutSiblingMarker } from "../codex/sibling-start";
+import { honorSiblingMarker, markSiblingStart, siblingRuntimeField, siblingStopFoundOwner, withoutSiblingMarker } from "../codex/sibling-start";
 import { consumeSiblingHandoff } from "../codex/sibling-handoff";
 import {
   reconcileClientStartupBeforeReady,
@@ -355,24 +355,15 @@ async function findProxyOwnerBeforeJournalRecovery(
   const pidSnapshot = readPidFileValue();
   const hasRuntimeOwner = readRuntimePort() !== null;
   const shouldProbe = pidSnapshot !== null || hasRuntimeOwner || options.probeConfiguredPort === true;
-  // A negative answer here is acted on twice over: the caller walks past a proxy it was
-  // supposed to find, and the lines below delete this home's pid record and reconcile the
-  // journal. One 750ms probe is not enough evidence for either (#5004) — a transport
+  // A negative answer lets the caller walk past a proxy it was supposed to find and
+  // deletes this home's stale pid record. Journal recovery follows cross-home discovery.
+  // One 750ms probe is not enough evidence for that (#5004) — a transport
   // failure is indistinguishable from an empty port, and the reported Windows duplicate
   // came from exactly that answer on a proxy the previous command had just found healthy.
   const live = shouldProbe ? await findLiveProxy(START_OWNERSHIP_LIVENESS) : null;
   if (live) return { live, pidSnapshot };
 
-  // The probe established that the snapshotted owner is stale. Compare before
-  // deleting so a concurrent start that rewrote the PID file keeps its state.
   removePidIfValueIs(pidSnapshot);
-  // A marked sibling's owner can be down mid-restart; its journal is still not ours to replay.
-  if (!currentExternalCodexModelProvider() && siblingOfLivePort() === null) {
-    const clientState = readClientConnectionState();
-    reconcileJournal(clientState.kind === "connected"
-      ? { activeClientApiKeyId: clientState.value.apiKeyId }
-      : undefined);
-  }
   return { live: null, pidSnapshot };
 }
 
@@ -413,8 +404,7 @@ async function handleStart(options: { block?: boolean } = {}) {
     }
   }
   const requestedPort = startOpts.port;
-  // Probe the configured port even without state files: a fallback sibling can remove them,
-  // and an unprobed start could shadow the owner and reroute Codex to a short-lived port.
+  // Probe the configured port even without state files: a fallback sibling can remove them.
   // Consume a sibling replacement's handoff before probing, even if its owner is momentarily down.
   let siblingStart = honorSiblingMarker(process.env, consumeSiblingHandoff) !== null;
   // A restart replacement waits out its draining parent instead of refusing it, and bounds its handoff log (restart-handoff.ts).
@@ -448,6 +438,11 @@ async function handleStart(options: { block?: boolean } = {}) {
       + `Startup continues only for an independent OPENCODEX_HOME; one state directory has one spend-ledger writer.`,
     );
   }
+  if (!owner.live && !siblingStart) {
+    const ownerPort = await findCrossHomeOwner();
+    if (ownerPort !== null) { siblingStart = true; markSiblingStart(ownerPort); }
+  }
+  if (!siblingStart) reconcileStartupJournal();
 
   const clientState = readClientConnectionState();
   if (clientState.kind === "invalid" || clientState.kind === "mismatched") {
@@ -503,6 +498,10 @@ async function handleStart(options: { block?: boolean } = {}) {
           }
           siblingStart = true;
           markSiblingStart(fencedLive.port);
+        }
+        if (!fencedLive && !siblingStart) {
+          const ownerPort = await findCrossHomeOwner();
+          if (ownerPort !== null) { siblingStart = true; markSiblingStart(ownerPort); }
         }
 
         // Port selection is check-then-bind. The lease prevents every cooperating start or
@@ -749,6 +748,7 @@ function detachedStartEnvironment(): NodeJS.ProcessEnv {
 
 async function handleEnsure(options: { existingIsSuccess?: boolean } = {}): Promise<boolean> {
   const owner = await findProxyOwnerBeforeJournalRecovery({ probeConfiguredPort: true });
+  if (!owner.live) reconcileStartupJournal();
   const config = loadConfig();
   if (!codexAutoStartEnabled(config)) {
     console.log("Codex autostart is disabled.");
