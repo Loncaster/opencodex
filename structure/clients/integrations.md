@@ -32,6 +32,7 @@ parsing and ownership rules below.
 | `src/integrations/registry.ts` | Canonical config/detection paths, current-provider-store declarations, source-preserving YAML declarations, writer-lock behavior, and client IDs. |
 | `src/integrations/target.ts` | Which file one operation reads, writes and records, and whether a write there reaches the client. |
 | `src/integrations/config-io.ts` | Bounded file loading and parsing. Values that cannot round-trip through the target serializer are rejected before mutation. |
+| `src/integrations/kilo-candidates.ts` | Inspects all Kilo global config candidates for unsafe files and a competing `provider.opencodex` block before status or mutation. |
 | `src/integrations/state.ts` | The single `absent` / `current` / `stale` / `conflict` / `unsafe` classifier used by status and every writer operation. |
 | `src/integrations/ownership.ts` | Durable ownership records: file, generated contribution, protected contribution, exact fragment paths, and operation identity. |
 | `src/integrations/ownership-policy.ts` | Client-scoped declarations for fields a client is documented to derive after apply. It must never contain a broad format-wide exemption. |
@@ -173,7 +174,7 @@ All registered integrations consume the shared catalog, including [Anthropic see
 
 | Client | Per-model output |
 | --- | --- |
-| OpenCode | `attachment`, `modalities.input` |
+| OpenCode, Kilo | `attachment`, `modalities.input` |
 | Pi, OMP, Prime, Aside, omo, Gajae, DSH | `input` (text/image only) |
 | ZCode | `modalities.input` (text/image only) |
 | Cline | `modalities.input`, `supportsVision` |
@@ -374,6 +375,35 @@ separate. Restore reconciles target intent from validated snapshot ownership wit
 sibling policy. Profile journal views retain source-store provenance for older legacy entries.
 
 The shared atomic replacement publisher also identifies explicit Remote Workspace file writes as `remote-workspace`; its isolated owner and support limits are documented in [Remote Workspace](../remote-workspace.md).
+
+## Kilo global JSONC
+
+Kilo owns only `provider.opencodex` in the first existing global file among `kilo.jsonc`,
+`kilo.json`, `opencode.jsonc`, `opencode.json`, and `config.json` under `~/.config/kilo`
+(`XDG_CONFIG_HOME` relocates that directory). Parse accepts JSONC comments and trailing
+commas; serialize rewrites the whole file as pretty JSON, so comments in other keys are
+not preserved. Kilo is not on the implicit owned-catalog fan-out. Remote admission uses
+the same `{env:OPENCODEX_KILO_API_KEY}` / `x-opencodex-api-key` rule as OpenCode.
+All candidate files are inspected through the no-follow, bounded parser before status or
+mutation. If another candidate defines `provider.opencodex`, status reports a conflict and
+preview/apply refuse with both paths named; an unsafe or unparseable candidate also refuses.
+
+Because that resolution depends on which candidates EXIST, a candidate created after
+apply can win discovery while the owned file still holds the block. The registry's
+opt-in `bindsDriftedRecord` seam covers exactly that case: while the recorded path is
+still one of Kilo's own candidates under the current env and home, reads and mutations
+stay bound to the recorded file (status reports it, disable removes the block from it,
+and both restore paths act on the journaled file instead of refusing) and priority
+discovery resumes only once the record is dropped. A record from a
+different home never binds, preserving the audit contract that a record for one home
+cannot authorize a write to another.
+
+Restore of a journaled candidate stays legal while that file is the current owner, and
+while no record owns the client (undoing the disable that dropped the record). It is
+refused, by both direct restore and preview, when a different Kilo candidate currently
+holds the single ownership record. Committing the older row's prior record would point
+ownership back at the old file and leave the active block on disk with nothing to
+disable it.
 
 ## Cline paired files
 

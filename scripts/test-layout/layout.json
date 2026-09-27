@@ -1074,6 +1074,7 @@
     "jev-decision.test.ts": "routing",
     "jev-provider.test.ts": "providers",
     "keyring-smoke.test.ts": "ci-workflows",
+    "kilo-client.test.ts": "clients",
     "kimi-oauth-identity.test.ts": "providers",
     "kimi-responses-adjacency.test.ts": "providers",
     "kiro-account-load.test.ts": "providers/kiro",

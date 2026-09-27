@@ -33,11 +33,13 @@ import {
 } from "./ownership-policy";
 import {
   INTEGRATION_CLIENTS,
+  boundIntegrationConfigPath,
   resolveIntegrationPaths,
   unresolvedPathHintFor,
   type IntegrationClientId,
 } from "./registry";
 import { resolveIntegrationTarget, type IntegrationTarget } from "./target";
+import { inspectKiloCandidates } from "./kilo-candidates";
 import { createIntegrationStateStore, type IntegrationStateStore } from "./store";
 
 export type IntegrationState = "absent" | "current" | "stale" | "conflict" | "unsafe";
@@ -49,6 +51,7 @@ export type StateReason =
   /** A container we would have to write through holds a non-object value. */
   | "blocked-container"
   | "ambiguous-selector"
+  | "candidate-conflict"
   /** A path selector we cannot resolve, e.g. a relative OPENCLAW_CONFIG_PATH. */
   | "unresolvable-path";
 
@@ -530,8 +533,12 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
      * would let the badge and the switch disagree.
      */
     record = store.readRecords()[input.clientId] ?? null;
+    const recordedPath = boundIntegrationConfigPath({
+      clientId: input.clientId, record, resolvedPath: paths.configPath,
+      statKind: io.statKind, env: input.env, home: input.home,
+    });
     effective = resolveIntegrationTarget({
-      clientId: input.clientId, configPath: paths.configPath, io, record, env: input.env, home: input.home,
+      clientId: input.clientId, configPath: recordedPath, io, record, env: input.env, home: input.home,
     });
   } catch (error) {
     if (!(error instanceof ClientPathError)) throw error;
@@ -558,6 +565,17 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
   }
 
   const configPath = effective.configPath;
+  if (input.clientId === "kilo") {
+    const candidates = inspectKiloCandidates({ io, selectedPath: configPath, env: input.env, home: input.home });
+    if (candidates.kind !== "ok") return {
+      clientId: input.clientId,
+      state: candidates.kind === "conflict" ? "conflict" : "unsafe",
+      installed,
+      configPath,
+      reason: candidates.kind === "conflict" ? "candidate-conflict" : candidates.why,
+      ...retention,
+    };
+  }
   const loaded = loadTarget(io, configPath);
   if (!loaded.ok) {
     return {
@@ -572,7 +590,7 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
 
   const parsed = input.clientId === "cline"
     ? parseClineDocument(loaded.before)
-    : parseConfig(loaded.before, effective.format);
+    : parseConfig(loaded.before, effective.format, EXPORT_CLIENTS[input.clientId].jsonc ? { jsonc: true } : undefined);
   const contribution = effective.buildContribution(exportContextOf(input));
   const { state, reason } = classifyIntegration({
     fileText: loaded.before,

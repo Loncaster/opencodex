@@ -48,6 +48,10 @@ import {
   zcodeStoreSchemaEstablished,
   type BuildContribution,
   type ConfigFormat,
+  kiloConfigPath,
+  kiloHomeDir,
+  kiloCandidatePath,
+  KILO_CONFIG_CANDIDATES,
   type ExportClientId,
 } from "../clients/config-export";
 
@@ -115,6 +119,19 @@ export interface IntegrationClientSpec {
    * catalog. `resolveIntegrationPaths` still throws for callers that mutate.
    */
   unresolvedPathHint?: (env?: NodeJS.ProcessEnv, home?: string) => string;
+  /**
+   * Recognize a resolution drift that is still THIS client's own file, for a
+   * client whose config path depends on mutable world state rather than only
+   * env and home.
+   *
+   * Kilo resolves to the first EXISTING candidate, so a candidate created
+   * after apply moves resolution while the owned file still holds our block.
+   * While this predicate accepts the recorded path, reads and mutations stay
+   * bound to it instead of silently re-homing onto the newcomer. A client
+   * without this hook never binds: a record from another home stays a refusal
+   * ("a record for one home cannot authorize a write to another").
+   */
+  bindsDriftedRecord?: (recordPath: string, env?: NodeJS.ProcessEnv, home?: string) => boolean;
 }
 
 /**
@@ -345,10 +362,79 @@ export const INTEGRATION_CLIENTS: Record<IntegrationClientId, IntegrationClientS
     detectDir: (env = process.env, home = homedir()) => clineSettingsDir(env, home),
     writerLock: { suffix: ".lock" },
   },
+  kilo: {
+    id: "kilo",
+    configPath: (env = process.env, home = homedir()) => kiloConfigPath(env, home),
+    detectDir: (env = process.env, home = homedir()) => kiloHomeDir(env, home),
+    bindsDriftedRecord: (recordPath, env = process.env, home = homedir()) =>
+      KILO_CONFIG_CANDIDATES.some(name => recordPath === kiloCandidatePath(kiloHomeDir(env, home), name)),
+  },
 };
 
 export const INTEGRATION_CLIENT_IDS: readonly IntegrationClientId[] =
   Object.keys(INTEGRATION_CLIENTS) as IntegrationClientId[];
+
+/**
+ * The effective config path for a read or mutation, given the ownership record.
+ *
+ * One implementation for status AND the mutation planner: when only one side
+ * carried the binding, the two could disagree again and status would report a
+ * file the writer never touches. Binds only while the client's own
+ * `bindsDriftedRecord` accepts the recorded path (still one of that client's
+ * candidates under the CURRENT env and home) and the file still exists; a
+ * record from another home never binds and keeps its refusal contract.
+ */
+export function boundIntegrationConfigPath(input: {
+  clientId: IntegrationClientId;
+  record: { clientId: IntegrationClientId; configPath: string } | null;
+  resolvedPath: string;
+  statKind: (path: string) => string;
+  env?: NodeJS.ProcessEnv;
+  home?: string;
+}): string {
+  const record = input.record;
+  if (
+    record && record.clientId === input.clientId &&
+    record.configPath !== input.resolvedPath &&
+    input.statKind(record.configPath) === "file" &&
+    INTEGRATION_CLIENTS[input.clientId].bindsDriftedRecord?.(record.configPath, input.env, input.home) === true
+  ) {
+    return record.configPath;
+  }
+  return input.resolvedPath;
+}
+
+/**
+ * Why a historical restore must not run, or null when it may.
+ *
+ * Kilo keeps one ownership record and may legally have written more than one
+ * candidate. Treating every same-home journaled path as a restore target lets
+ * an undo of an older file commit that file's prior record over the candidate
+ * that owns the integration now. The managed block in the current file stays
+ * on disk, the record points at the old file, and a later disable drops the
+ * record and orphans the newcomer.
+ *
+ * A missing current record is not a collision: undoing the disable that
+ * dropped it still restores the journaled file. A client without
+ * bindsDriftedRecord is unchanged, because that seam is what made the second
+ * candidate a legal target. Direct restore and its preview both ask here, so
+ * they cannot admit different answers.
+ */
+export function restoreOwnershipCollision(input: {
+  clientId: IntegrationClientId;
+  journaledPath: string;
+  currentPath: string | null;
+  env?: NodeJS.ProcessEnv;
+  home?: string;
+}): string | null {
+  const currentPath = input.currentPath;
+  if (currentPath === null || currentPath === input.journaledPath) return null;
+  const binds = INTEGRATION_CLIENTS[input.clientId].bindsDriftedRecord;
+  if (!binds) return null;
+  if (binds(input.journaledPath, input.env, input.home) !== true) return null;
+  if (binds(currentPath, input.env, input.home) !== true) return null;
+  return `that operation was recorded for ${input.journaledPath}, but ${currentPath} currently owns this integration`;
+}
 
 export function isIntegrationClientId(value: string): value is IntegrationClientId {
   return Object.prototype.hasOwnProperty.call(INTEGRATION_CLIENTS, value);

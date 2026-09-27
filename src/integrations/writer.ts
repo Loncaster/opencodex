@@ -33,7 +33,13 @@ import {
   semanticProtectedContributionFingerprint,
 } from "./ownership-policy";
 import { AmbiguousSelectorError, createdContainerPaths, mergeContribution, removeFragments } from "./merge";
-import { INTEGRATION_CLIENTS, isLoopbackOnly, resolveIntegrationPaths, type IntegrationClientId } from "./registry";
+import {
+  INTEGRATION_CLIENTS,
+  isLoopbackOnly,
+  resolveIntegrationPaths,
+  restoreOwnershipCollision,
+  type IntegrationClientId,
+} from "./registry";
 import { declaredIntegrationTarget } from "./target";
 import { exportContextOf } from "./state";
 import type { IntegrationState } from "./state";
@@ -624,6 +630,21 @@ export function restoreIntegration(input: IntegrationRestoreInput): WriteOutcome
   if (rowTarget === null) {
     return refuse(clientId, "conflict", "conflict",
       `that operation was recorded for ${configPath}, which this client no longer writes; it now resolves to ${resolvedPath}`);
+  }
+  /*
+   * Preview refuses this in observeRestore. Refusing here too is what keeps an
+   * undo of an older candidate from replacing the record a newer candidate owns.
+   */
+  const currentOwner = store.readRecords()[clientId] ?? null;
+  const collision = restoreOwnershipCollision({
+    clientId,
+    journaledPath: configPath,
+    currentPath: currentOwner && currentOwner.clientId === clientId ? currentOwner.configPath : null,
+    env: input.env,
+    home: input.home,
+  });
+  if (collision !== null) {
+    return refuse(clientId, "conflict", "conflict", collision);
   }
   if (clientId === "cline") {
     try { io = createClineIO(io, configPath, store, true); }
