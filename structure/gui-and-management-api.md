@@ -15,6 +15,12 @@ Native steering follows [the shared WebSocket contract](transports/streaming-hea
 The shared server request path follows the Responses
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior. The configuration-only [priority failback](providers/openai-accounts.md#ongoing-priority-failback) preference adds no new dashboard control or account-eligibility override.
 
+The Overview Memory routing panel reads and saves optional per-phase `memoryModels` through
+`src/server/management/config-routes.ts`. Settings GET and PUT echo the persisted block; PUT
+rejects malformed targets without dropping unrelated config. An unknown saved model remains
+visible for correction, and disabling a phase removes its effort setting. The route contract is
+defined by [memory phase routing](transports/responses-failover.md#memory-phase-routing).
+
 The configuration-only [plaintext V2 contract](subagents.md#plaintext-v2-agent-messages)
 is scoped to canonical ChatGPT Responses forwarding; other source-area behavior described here is unchanged. Response-attached WebSocket telemetry follows the [stage record identity contract](transports/responses-wire-shapes.md#passthrough-sse-stream-shapes-314). Management provider-validation calls use the [initialization-independent relative send-path validation](config.md#provider-relative-send-paths) before persistence. Catalog HTTP acquisition follows the [proxy-routing contract](catalog.md#remote-catalog-http-proxy-routing). CLI installation inspection reason codes, including Windows deferral, follow the [runtime inspection contract](runtime.md#lifecycle).
 

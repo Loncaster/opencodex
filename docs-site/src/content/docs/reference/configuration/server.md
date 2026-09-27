@@ -41,6 +41,7 @@ runs helper features around provider requests.
 | `resetCreditAutoRedeem?` | `{ enabled?: boolean; leadTimeMinutes?: number }` | off | Opt-in: redeem the main Codex account's soonest-expiring reset credit `leadTimeMinutes` (1–60, default 10) before it expires. Every attempt re-reads the upstream credit list first and skips when the credit is gone (for example, redeemed by hand); the `redeem_request_id` is journaled in `$OPENCODEX_HOME/reset-credit-auto-redeem.json` before the call so a crash replays the same idempotent request instead of spending a second credit. Servers sharing this configuration directory coordinate reservations and settlements so one process does not replace another's request record. Logs carry a hashed account key only. |
 | `syncResumeHistory?` | `boolean` | `true` | Reversible Codex App history compatibility. Original metadata is backed up and restored by `ocx stop` / `ocx restore`. |
 | `shadowCallIntercept?` | `{ enabled?: boolean; model?: string; sourceModels?: string[] }` | off | Redirect recognized Codex helper/shadow calls to a chosen model while preserving the request's configured reasoning effort. The default source prefixes are `gpt-6-luna` and `gpt-5.6-luna`; older clients through 0.144.x used `gpt-5.4-mini`, which `sourceModels` can restore. |
+| `memoryModels?` | `{ extract?: { model: string; reasoningEffort?: string }; consolidation?: { model: string; reasoningEffort?: string } }` | off | Route Codex's two memory phases to a chosen model, with an optional reasoning effort per phase. See [Memory routing](#memory-routing). |
 | `webSearchSidecar?` | `OcxWebSearchSidecarConfig` | on when usable | Web-search sidecar options. |
 | `visionSidecar?` | `OcxVisionSidecarConfig` | on when usable | Image-description sidecar options. |
 | `images?` | `OcxImagesConfig` | automatic OpenAI selection | Standalone Images relay options for Codex `image_gen`. |
@@ -657,6 +658,55 @@ instead, so the summary stays readable when the conversation resumes on its own 
 caller's credential does not cross to the other provider. The selected model must support the
 input size and content. Restart the proxy after editing
 `config.json` by hand. Dashboard saves apply immediately.
+
+## Memory routing
+
+In **Dashboard → Overview → Memory routing**, choose a model and an optional reasoning effort for
+each of Codex's two memory phases, then click **Save**. Select **Off** and save to
+remove the override. Changes apply to the next memory request without restarting the proxy.
+
+Set `memoryModels` in OpenCodex `config.json` to route those requests. With the block omitted,
+both phases keep their existing route. The phases are independent: configuring one leaves the
+other alone.
+
+```json
+{
+  "memoryModels": {
+    "extract": { "model": "provider/model-id", "reasoningEffort": "low" },
+    "consolidation": { "model": "provider/model-id", "reasoningEffort": "medium" }
+  }
+}
+```
+
+`extract` is the pass that summarizes one finished session into a raw memory; `consolidation` is the
+single agent run that merges those raw memories into the files under `$CODEX_HOME/memories`.
+`model` accepts native model IDs, provider-qualified model IDs, and configured combos.
+`reasoningEffort` is optional; omit it to keep the effort Codex asked for. Supported declarations are
+`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. Codex hard-codes `low` for
+extract and `medium` for consolidation, so a configured effort replaces that value.
+
+OpenCodex recognizes these requests from Codex's own turn metadata: `request_kind: "memory"` in
+the `x-codex-turn-metadata` header marks an extract pass, and `thread_source:
+"memory_consolidation"` marks the consolidation thread. On HTTP, a request whose
+`x-openai-subagent` header names `memory_consolidation` counts as a consolidation pass only when
+turn metadata is absent. Explicit non-memory metadata wins over that fallback. The model id is
+deliberately not a signal: the extract pass runs on the same helper model
+Codex uses for titles and commit messages, so a model-based rule would also capture ordinary
+helper calls. Missing, malformed, or conflicting metadata does not activate the override; when
+several copies of the metadata are supplied they must name the same phase. WebSocket requests use
+each frame's metadata rather than the connection's earlier handshake metadata — the bridge
+re-attaches the handshake's `x-openai-subagent` header to every frame, so that header names the
+connection, not the current pass, and is not a websocket signal.
+
+A configured phase wins when `shadowCallIntercept` would match the same request. A phase left off
+keeps its current routing, including any existing shadow-call rule that matches its model. The
+selected model's provider receives the session text Codex summarizes for memory, including
+sessions that normally run on another provider; the dashboard panel states this next to the model
+pickers. A phase whose target stopped resolving — the provider is
+disabled or deleted, or its combo no longer exists — fails that memory call with `409` and error code
+`memory_model_target_unavailable` instead of falling back to the default provider. The request log
+names the phase (`memory-extract` or `memory-consolidation`) as the routing reason. Restart the
+proxy after editing `config.json` by hand. Dashboard saves apply immediately.
 
 ## Shadow calls
 
