@@ -55,7 +55,7 @@ proxy activation (`structure/config-proxy.md:1-20`).
 | Item | Current head/state | Decision and evidence | Work phase |
 | --- | --- | --- | --- |
 | #6051 | `987b8097`, open | Carry the disposable-home management-API recipe with a discoverable contributor link; `.agents/skills/` has no existing entry point. | [010](010_recipe.md) |
-| #5893 / #5853 | `3743320a`, draft | Carry only after safe bypass translation: every macOS exception must be faithfully representable or discovery refuses before any environment write; inherited SOCKS keeps its existing path. The PR currently appends exceptions only to `NO_PROXY` while Bun may read lowercase first (`src/config/proxy-env.ts:267` in PR). | [020](020_macos_proxy.md) |
+| #5893 / #5853 | `3743320a`, draft | Carry only when every macOS exception maps faithfully onto the bypass variables the active transports read, or discovery refuses before any environment write; an inherited SOCKS proxy keeps its existing path. | [020](020_macos_proxy.md) |
 | #5950 / #5660 | `ef03f5ab`, open | Carry Qoder after current-base revalidation of opt-in config writes, restore, and path handling (`src/clients/config-export/qoder.ts`, PR test). | [030](030_qoder.md) |
 | #5272 | `7dd796d7`, open | Carry Kilo after checking all merged config candidates; first-file-only selection can be overridden by a later legacy file (`src/clients/config-export/kilo.ts:57-63` in PR). | [040](040_kilo.md) |
 | #5193 | `91090f80`, open/conflicting | Reimplement a focused Droid slice on current `dev` only if its client contract and export provenance can be proven. The PR's broad rewrite changes shared loopback export behavior. | [050](050_droid.md) |

@@ -1,9 +1,9 @@
 # Phase 7: selected models for Codex memory (#5983)
 
 Depends on `060_jev.md` for serial changes to `src/types/config.ts`. The source
-PR spans 51 files. Its metadata classifier currently falls back to the
-`x-openai-subagent` header after explicit non-memory turn metadata and can
-reroute an ordinary turn; that edge must fail closed before any carry.
+PR spans 51 files. The carried classifier treats explicit turn metadata as
+authoritative and consults the `x-openai-subagent` header only when that
+metadata is absent.
 
 ## Exact change map
 

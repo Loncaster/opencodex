@@ -17,13 +17,11 @@ explicit proxy precedence. `structure/config-proxy.md:1-20` owns the contract.
   `localhost` must not enter either effective proxy-bypass variable as a
   suffix. If any system exception is not faithfully representable, refuse
   macOS auto-discovery and leave process proxy variables unchanged with a
-  privacy-safe diagnostic; silently dropping it could send an intended direct
-  host through the proxy. Preserve the address-only loopback bypass. Add
+  privacy-safe diagnostic. Preserve the address-only loopback bypass. Add
   proven-safe entries to the bypass variable the selected HTTP(S) transport
   actually reads. If inherited `ALL_PROXY`/`all_proxy` selects SOCKS,
-  macOS discovery must not add scheme proxies or discovered exceptions:
-  the SOCKS wrapper reads uppercase `NO_PROXY` while Bun reads lowercase
-  `no_proxy`. Preserve the inherited proxy path and assert both transports'
+  macOS discovery must not add scheme proxies or discovered exceptions.
+  Preserve the inherited proxy path and assert both transports'
   effective routes when the two bypass variables disagree. Redact
   credential-bearing proxy URLs.
 - MODIFY `tests/server/proxy-env.test.ts`: retain source tests and add a case
