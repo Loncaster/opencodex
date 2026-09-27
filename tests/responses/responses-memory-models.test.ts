@@ -102,6 +102,13 @@ describe("memory phase detection", () => {
     // Any other internal turn category is not a memory turn.
     expect(detectMemoryModelPhase(body(), new Headers({ "x-openai-subagent": "collab_spawn" }))).toBeNull();
     expect(detectMemoryModelPhase(body(), new Headers({ "x-openai-subagent": "review" }))).toBeNull();
+    // Malformed client metadata is not absent metadata: the header fallback stays closed.
+    for (const malformed of ["bad", 42, ["x"], true]) {
+      expect(detectMemoryModelPhase(
+        { ...body("gpt-5.6-terra"), client_metadata: malformed },
+        new Headers({ "x-openai-subagent": "memory_consolidation" }),
+      )).toBeNull();
+    }
   });
 
   test("an ordinary turn, absent metadata, or malformed metadata is never a memory turn", () => {

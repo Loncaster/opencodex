@@ -64,7 +64,11 @@ export function detectMemoryModelPhase(
   const metadata: unknown[] = [];
   const header = headers.get(TURN_METADATA_HEADER);
   if (options.transport !== "websocket" && header !== null) metadata.push(header);
-  const client = record(record(body)?.["client_metadata"]);
+  const rawClient = record(body)?.["client_metadata"];
+  // Present but malformed client metadata is a turn that failed validation, not an absent
+  // copy; it must not fall through to the connection-level sub-agent header below.
+  if (rawClient !== undefined && rawClient !== null && !record(rawClient)) return null;
+  const client = record(rawClient);
   if (client && Object.hasOwn(client, TURN_METADATA_HEADER)) metadata.push(client[TURN_METADATA_HEADER]);
 
   let verdict: CopyVerdict | null = null;
