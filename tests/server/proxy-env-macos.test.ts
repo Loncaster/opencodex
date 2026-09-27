@@ -84,6 +84,8 @@ describe('macOS proxy: "auto" (#5853)', () => {
     ["bad port", "HTTPEnable : 1\nHTTPProxy : proxy.example\nHTTPPort : 0"],
     ["bad enable", `${both}\nHTTPEnable : maybe`],
     ["bad syntax", "HTTPEnable : 1\nHTTPProxy : proxy.example\nHTTPPort : 8080\nExceptionsList : <array> {\n0 : 127.0.0.1"],
+    ["SOCKS-only", "SOCKSEnable : 1\nSOCKSProxy : socks.example\nSOCKSPort : 1080"],
+    ["scoped-only", `__SCOPED__ : <dictionary> {\nen0 : <dictionary> {\n${both}\n}\n}`],
     ["simple host bypass", `${both}\nExcludeSimpleHostnames : 1`],
     ["PAC", `${both}\nProxyAutoConfigEnable : 1`],
   ])("%s settings leave egress unchanged", (_case, body) => {
@@ -156,6 +158,25 @@ describe('macOS proxy: "auto" (#5853)', () => {
       expect(noProxyMatches(url, { NO_PROXY: process.env.NO_PROXY })).toBe(socksBypass);
       expect(noProxyMatches(url, { no_proxy: process.env.no_proxy })).toBe(bunBypass);
     }
+  });
+
+  test.skipIf(process.platform === "win32")("Bun's lowercase bypass and the WebSocket route's uppercase bypass remain distinct", () => {
+    process.env.HTTP_PROXY = "http://http.example:8080";
+    process.env.NO_PROXY = "upper.example.com";
+    process.env.no_proxy = "lower.example.com";
+    const before = snapshot();
+    applyProxyEnvWith(config("auto"), { platform: "darwin", macOSReader: () => { throw new Error("must not read"); } });
+    expect(snapshot()).toEqual(before);
+    const upper = new URL("http://upper.example.com/");
+    const lower = new URL("http://lower.example.com/");
+    // Bun uses the non-empty lowercase value; resolveProxyRoute uses uppercase
+    // even when that key is explicitly defined as an empty string.
+    expect(noProxyMatches(upper, { no_proxy: process.env.no_proxy })).toBe(false);
+    expect(noProxyMatches(lower, { no_proxy: process.env.no_proxy })).toBe(true);
+    expect(resolveProxyRoute(new URL("ws://upper.example.com/"))).toEqual({ kind: "direct" });
+    expect(resolveProxyRoute(new URL("ws://lower.example.com/"))).toEqual({ kind: "proxy", proxy: process.env.HTTP_PROXY });
+    process.env.NO_PROXY = "";
+    expect(resolveProxyRoute(new URL("ws://lower.example.com/"))).toEqual({ kind: "proxy", proxy: process.env.HTTP_PROXY });
   });
 
   test("the outbound proxy matcher does not widen localhost to app.localhost", () => {
