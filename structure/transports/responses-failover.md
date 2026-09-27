@@ -277,6 +277,18 @@ The [explicit model-capability contract](../config.md#explicit-per-model-capabil
 
 Provider-scoped approval reviewer settings are projected by the [catalog owner](../catalog.md#provider-scoped-approval-reviewer); this surface retains its existing routing, transport and account-selection behavior. Translated audio/file admission follows the [final-adapter input contract](../adapters/registry.md#untranslated-input-media); native raw passthrough remains separate. Unicode pattern normalization uses [copy-on-write traversal](byte-accounting.md#unicode-pattern-normalization) while preserving the existing schema and wire semantics.
 
+## Memory phase routing
+
+`src/server/responses/memory-models.ts` classifies Codex memory turns from validated
+`x-codex-turn-metadata` in HTTP headers or per-frame WebSocket `client_metadata`.
+`request_kind: "memory"` selects extract; `thread_source: "memory_consolidation"`
+selects consolidation. Supplied copies must agree. Explicit non-memory metadata blocks the
+HTTP `x-openai-subagent: memory_consolidation` fallback, which applies only when turn metadata
+is absent. WebSocket frames never use that handshake fallback. A configured phase in
+`memoryModels` wins over shadow-call interception; an unset phase keeps its existing route.
+Unavailable targets return 409 without contacting a different provider, while scoped API-key
+admission keeps its own refusal. Combo children retain the phase and its optional effort.
+
 ## Compaction routing overrides
 
 `src/server/responses/compaction-routing.ts` applies `compactionRouting` before model routing in

@@ -473,5 +473,10 @@ same way. `src/types/wire.ts` owns accepted wire enumerations such as the per-pr
 HTTP-version pin, shared by the config load schema, the management write boundary, and the fetch
 runtime, so no boundary accepts a value another rejects.
 
+`src/types/config.ts` declares the optional per-phase `memoryModels` setting;
+`src/types/request.ts` carries the selected phase through combo handoffs without changing the
+public request model. [Memory phase routing](transports/responses-failover.md#memory-phase-routing)
+owns the selection rule.
+
 Preflight heartbeat retention keeps `replayUnsafe` sticky in the replayed tail, so a second
 preflight cannot forget earlier side effects after the original marker is evicted.
