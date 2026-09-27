@@ -152,6 +152,12 @@ describe("combo-workspace-data", () => {
     expect(toPutBody(blankNote).combo.targets[0]).toEqual({ provider: "a", model: "m1" });
     expect(validate({ ...parsed, targets: [{ ...parsed.targets[0]!, modelProfile: "x".repeat(513) }] }))
       .toBe("invalidModelProfile");
+    expect(validate({ ...parsed, targets: [{ ...parsed.targets[0]!, modelProfile: "Bell\u0007note" }] }))
+      .toBe("invalidModelProfile");
+    expect(validate({ ...parsed, targets: [{ ...parsed.targets[0]!, modelProfile: "Del\u007fnote" }] }))
+      .toBe("invalidModelProfile");
+    expect(validate({ ...parsed, targets: [{ ...parsed.targets[0]!, modelProfile: "Line one\n\tLine two\r\nLine three" }] }))
+      .not.toBe("invalidModelProfile");
   });
 
   test("parse, dirty tracking, validation, and PUT preserve exact JEV target efforts", () => {

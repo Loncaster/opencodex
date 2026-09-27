@@ -221,8 +221,9 @@ answers fail open to the first eligible target; no response can escape the confi
 Telemetry never retains extracted state or credentials.
 
 The optional `targets[].modelProfile` note is validated at the Combo management input
-boundary to a non-empty string of at most 512 characters without control characters
-and stored sparsely.
+boundary to a non-empty string of at most 512 characters; tab, line feed and carriage
+return are allowed for multi-line notes, every other C0 control character and DEL is
+refused, and the value is stored sparsely.
 `src/combos/jev.ts` sends a configured target note as `state.operator_notes` on a
 JEV decision, keyed by target; built-in `instructions.model_profiles` and the
 target/effort allowlist stay authoritative. The note reaches TypeSafe with each

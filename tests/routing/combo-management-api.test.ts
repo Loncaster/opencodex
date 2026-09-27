@@ -309,7 +309,7 @@ describe("combo management API", () => {
       expect(reloaded.error).toBeNull();
       expect(reloaded.config.combos?.["jev-profile"]?.targets[0]?.modelProfile)
         .toBe("Low marginal subscription cost; 1M context.");
-      for (const invalidNote of [" ".repeat(513), "   ", "Unsafe\u0000note", 123]) {
+      for (const invalidNote of [" ".repeat(513), "   ", "Unsafe\u0000note", "Bell\u0007note", "Del\u007fnote", 123]) {
         const rejected = await comboApi(config, "PUT", "/api/combos", {
           id: "jev-profile",
           combo: { strategy: "jev", targets: [{ provider: "a", model: "m1", modelProfile: invalidNote }] },
@@ -322,6 +322,12 @@ describe("combo management API", () => {
       });
       expect(invalid?.status).toBe(400);
       expect(config.combos?.["jev-profile"]?.targets[0]?.modelProfile).toBe("Low marginal subscription cost; 1M context.");
+      const multiline = await comboApi(config, "PUT", "/api/combos", {
+        id: "jev-profile",
+        combo: { strategy: "jev", targets: [{ provider: "a", model: "m1", modelProfile: "Line one\n\tLine two\r\nLine three" }] },
+      });
+      expect(multiline?.status).toBe(200);
+      expect(config.combos?.["jev-profile"]?.targets[0]?.modelProfile).toBe("Line one\n\tLine two\r\nLine three");
     });
   });
 
