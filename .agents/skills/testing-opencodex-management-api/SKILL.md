@@ -16,10 +16,12 @@ Raycast integration can also update existing OpenCodex-owned entries under the O
 A temporary client directory alone is therefore not a complete isolation boundary.
 
 Within the disposable environment, allocate a unique scratch directory and set all of
-`OPENCODEX_HOME`, `CODEX_HOME`, `GROK_HOME`, `CLAUDE_CONFIG_DIR`, and
+`OPENCODEX_HOME`, `CODEX_HOME`, `CODEX_SQLITE_HOME`, `GROK_HOME`, `CLAUDE_CONFIG_DIR`, and
 `OPENCODEX_CLAUDE_DESKTOP_CONFIG_DIR` to distinct directories inside it before startup.
 Confirm the effective OS home belongs to the disposable account. Do not copy personal
 tokens, client configuration, shell profiles, or keychain contents into this environment.
+Start from a clean environment or inspect inherited path overrides before launching;
+`CODEX_SQLITE_HOME` otherwise takes precedence over `CODEX_HOME` for Codex state.
 
 Save a scratch `config.json` under `OPENCODEX_HOME` with an unused loopback port:
 
@@ -28,6 +30,7 @@ Save a scratch `config.json` under `OPENCODEX_HOME` with an unused loopback port
   "port": 19100,
   "hostname": "127.0.0.1",
   "codexAutoStart": false,
+  "syncResumeHistory": false,
   "clientIntegrations": {"codex": false, "grok": false, "claude-desktop": false},
   "claudeCode": {"enabled": false, "injectAgents": false, "systemEnv": false}
 }
@@ -87,7 +90,11 @@ A fixture-only manual run uses `POST /api/lab/automation/run` with this request 
 For `live_route_compatibility`, include `providerName` and `modelId` in the POST request
 body, not as substitute top-level configuration fields. The named provider must already
 exist in `config.providers`, and live calls require authorization and suitable test
-credentials. Consult `planManualLabRun` in `src/lab/automation/planner.ts` for accepted
+credentials. Lab must also be active at proxy startup: a later policy PUT alone does
+not register the live route executor. Enable automation in the disposable home, stop
+the foreground proxy, and start it again before a separately authorized live run.
+The fixture-only protocol exercise above does not need this restart. Consult
+`planManualLabRun` in `src/lab/automation/planner.ts` for accepted
 combinations instead of guessing a scenario or provider.
 
 The manual endpoint awaits dispatch and returns a run/trigger result. Inspect the returned

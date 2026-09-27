@@ -1,6 +1,6 @@
 # Phase 1: management API test recipe (#6051)
 
-The preceding D concluded that the reviewed roadmap is locked at `d264a776fa`;
+The preceding D concluded that the reviewed roadmap is locked at `ce5a406862`;
 the next action is this bounded recipe carry. Depends on `000_plan.md`;
 docs-only carry, then one ordinary PR. The source PR
 adds `.agents/skills/testing-opencodex-management-api/SKILL.md` with a
@@ -11,7 +11,7 @@ point before another agent can reliably discover it.
 
 - NEW `.agents/skills/testing-opencodex-management-api/SKILL.md`: carry the
   108-line source recipe from #6051 head `987b8097624e50e6c39b00aca145fe4755043c4b`
-  after verifying every command and path against current
+  with source-verified isolation and activation corrections after checking every command and path against current
   management routes. Preserve its disposable OS account/home, container, or
   VM prerequisite; redirect client homes and disable integrations before a
   smoke. `OPENCODEX_HOME` alone does not isolate client writes. Keep explicit
@@ -60,9 +60,14 @@ PR-only link would not be durable.
 
 ## Local carry outcome
 
-Copied the recipe byte-for-byte from #6051 head
-`987b8097624e50e6c39b00aca145fe4755043c4b`; `cmp` against that Git
-object exited 0 and the file has 108 lines. `AGENTS.md:212` links it beside
+Imported the recipe from #6051 head
+`987b8097624e50e6c39b00aca145fe4755043c4b`; the initial `cmp`
+against that Git object exited 0 at 108 lines. C-phase implementation review
+then required two source-grounded corrections to the final copy: redirecting
+Codex's SQLite home and disabling resume-history sync in the disposable
+configuration, and activating Lab at startup before a separately authorized
+live-route run. The final recipe therefore intentionally differs from the
+source PR. `AGENTS.md:212` links it beside
 the operating reference. The same independent A reviewer first found that
 an unstaged whitespace check would miss a staged change and the privacy scan
 would miss an untracked skill; the plan now stages all files before both gates,
@@ -78,3 +83,12 @@ the docs-only diff selected 0 tests. The live smoke was not run in this
 desktop account: it lacks the disposable OS-home prerequisite. Full local
 suite is omitted due to concurrent lane worktrees; CI remains the broader
 gate. PR-head and post-merge `dev` CI evidence are recorded after publication.
+
+After the C-phase corrections, the scratch `config.json` example parsed as
+JSON with `syncResumeHistory: false`; `git diff --cached --check` and
+`bun run privacy:scan` exited 0 on the staged revision. The independent
+implementation reviewer rechecked the SQLite and Lab startup paths and
+returned PASS. A separate token/isolation security reviewer also returned
+PASS on the amended recipe. Neither reviewer ran the live smoke, and the
+24-test route/planner run and typecheck predate only these documentation edits;
+no runtime source changed between those checks and this revision.
