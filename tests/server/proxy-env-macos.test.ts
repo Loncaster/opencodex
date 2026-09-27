@@ -50,23 +50,36 @@ describe('macOS proxy: "auto" (#5853)', () => {
   });
 
   test.each(["localhost", "LOCALHOST", "LoCaLhOsT."])(
-    "configured %s stays uppercase without widening Bun's lowercase bypass", localhost => {
+    "configured %s refuses discovery with inherited lowercase bypass", localhost => {
       process.env.no_proxy = "lower.example";
-      applyProxyEnvWith(config("auto", [localhost, "private.example"]), {
-        platform: "darwin", macOSReader: () => scutil(both),
-      });
-      expect(process.env.NO_PROXY?.split(",")).toContain(localhost);
-      expect(process.env.NO_PROXY?.split(",")).toContain("private.example");
-      expect(process.env.no_proxy?.split(",")).toContain("private.example");
-      expect(process.env.no_proxy?.split(",").some(entry => /^localhost\.?$/i.test(entry))).toBe(false);
-      const app = new URL("http://app.localhost/");
-      expect(noProxyMatches(app, { no_proxy: process.env.no_proxy })).toBe(false);
-      expect(resolveProxyRoute(new URL("ws://app.localhost/")))
-        .toEqual({ kind: "proxy", proxy: "http://proxy.example:8080" });
-      expect(noProxyMatches(new URL("http://private.example/"), { no_proxy: process.env.no_proxy })).toBe(true);
-      expect(resolveProxyRoute(new URL("ws://private.example/"))).toEqual({ kind: "direct" });
+      process.env.NO_PROXY = "upper.example";
+      const before = snapshot();
+      const lines: string[] = [];
+      const original = console.log;
+      console.log = (...args) => { lines.push(args.join(" ")); };
+      try {
+        applyProxyEnvWith(config("auto", [localhost, "private.example"]), {
+          platform: "darwin", macOSReader: () => scutil(both),
+        });
+      } finally { console.log = original; }
+      expect(snapshot()).toEqual(before);
+      expect(lines.join(" ")).toContain("discovery refused");
+      expect(lines.join(" ")).not.toContain("private.example");
     },
   );
+
+  test("without inherited lowercase bypass, configured localhost keeps the uppercase-only route", () => {
+    applyProxyEnvWith(config("auto", ["localhost", "private.example"]), {
+      platform: "darwin", macOSReader: () => scutil(both),
+    });
+    expect(process.env.NO_PROXY?.split(",")).toContain("localhost");
+    expect(process.env.NO_PROXY?.split(",")).toContain("private.example");
+    expect(process.env.no_proxy).toBeUndefined();
+    expect(resolveProxyRoute(new URL("ws://localhost/"))).toEqual({ kind: "direct" });
+    expect(resolveProxyRoute(new URL("ws://app.localhost/")))
+      .toEqual({ kind: "proxy", proxy: "http://proxy.example:8080" });
+    expect(resolveProxyRoute(new URL("ws://private.example/"))).toEqual({ kind: "direct" });
+  });
 
   test("the all-host wildcard has the same bypass scope on both transports", () => {
     process.env.no_proxy = "lower.example";

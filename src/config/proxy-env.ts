@@ -231,6 +231,12 @@ export function applyProxyEnvWith(
         console.log(`[opencodex] proxy "auto": ${reason}; proxy environment unchanged`);
         return;
       }
+      const configured = configuredNoProxyEntries(config);
+      const inheritedLowercase = process.env.no_proxy?.trim();
+      if (inheritedLowercase && configured.some(host => /^localhost\.?$/i.test(host))) {
+        console.log('[opencodex] proxy "auto": configured noProxy "localhost" cannot be represented exactly for Bun while an inherited no_proxy is set; discovery refused');
+        return;
+      }
       const origins = [
         found.httpUrl && `HTTP ${describeProxyForLog(found.httpUrl)}`,
         found.httpsUrl && `HTTPS ${describeProxyForLog(found.httpsUrl)}`,
@@ -242,16 +248,12 @@ export function applyProxyEnvWith(
       if (found.httpUrl) process.env.HTTP_PROXY = found.httpUrl;
       if (found.httpsUrl) process.env.HTTPS_PROXY = found.httpsUrl;
       // Bun gives non-empty lowercase no_proxy priority over NO_PROXY. Before
-      // discovery there was no proxy, so suffix matching of a configured name
-      // can only keep that name and its subdomains on their prior direct route.
-      // Add configured entries and system exceptions to both effective paths,
-      // except bare localhost: Bun would match app.localhost as a suffix while
-      // the WebSocket matcher treats that name as exact.
-      const configured = configuredNoProxyEntries(config);
+      // discovery there was no proxy, so an ordinary configured name and its
+      // subdomains can stay direct in both paths. Bare localhost is refused
+      // above when lowercase is inherited: Bun cannot match it exactly there.
       mergeNoProxyEntries([...configured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
       if (process.env.no_proxy?.trim()) {
-        const bunConfigured = configured.filter(host => !/^localhost\.?$/i.test(host));
-        process.env.no_proxy = withNoProxyEntries(process.env.no_proxy, [...bunConfigured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
+        process.env.no_proxy = withNoProxyEntries(process.env.no_proxy, [...configured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
       }
       configureSocks5Fetch();
       return;
