@@ -220,6 +220,15 @@ and caller-cancellation propagation. Missing credentials or safe state, transpor
 answers fail open to the first eligible target; no response can escape the configured choice map.
 Telemetry never retains extracted state or credentials.
 
+The optional `targets[].modelProfile` note is validated at the Combo management input
+boundary to a non-empty string of at most 512 characters without control characters
+and stored sparsely.
+`src/combos/jev.ts` sends a configured target note as `state.operator_notes` on a
+JEV decision, keyed by target; built-in `instructions.model_profiles` and the
+target/effort allowlist stay authoritative. The note reaches TypeSafe with each
+applicable decision, so operators must keep secrets and private paths out of it.
+An absent note leaves the prior decision payload shape intact.
+
 `src/server/responses/core-combo.ts` computes current eligibility, asks JEV once for the initial pick,
 applies the validated effort, and removes caller `service_tier` for that child. A retryable child
 failure re-enters the ordinary Combo fallback loop from the untouched request without another JEV

@@ -70,6 +70,8 @@ export interface JevCandidate {
   provider: string;
   model: string;
   reasoningEfforts: readonly OcxComboDefaultEffort[];
+  /** Optional operator note sent as decision evidence for this target only. */
+  modelProfile?: string;
 }
 
 export interface JevDecision {
@@ -337,7 +339,7 @@ function hasImageContent(item: Record<string, unknown>): boolean {
   return item.content.some(part => isRecord(part) && (part.type === "input_image" || part.type === "image_url"));
 }
 
-export function buildJevState(body: unknown): Record<string, unknown> {
+export function buildJevState(body: unknown, candidates: readonly JevCandidate[] = []): Record<string, unknown> {
   const input = isRecord(body) ? body.input : undefined;
   let task = "";
   let previousAssistant = "";
@@ -383,11 +385,18 @@ export function buildJevState(body: unknown): Record<string, unknown> {
     }
   }
 
+  const operatorNotes: Record<string, string> = {};
+  for (const candidate of candidates) {
+    const note = candidate.modelProfile?.trim();
+    if (note) operatorNotes[candidate.key] = note;
+  }
+
   return {
     task,
     signals: { has_image: hasImage, tool_history: toolHistory },
     step,
     ...(previousAssistant ? { previous_assistant: previousAssistant.slice(-ASSISTANT_TAIL_CHARS) } : {}),
+    ...(Object.keys(operatorNotes).length ? { operator_notes: operatorNotes } : {}),
   };
 }
 
@@ -425,7 +434,9 @@ function candidateOptions(candidates: readonly JevCandidate[]): Map<string, JevR
 function candidatesFitRequestBounds(candidates: readonly JevCandidate[]): boolean {
   if (candidates.length > JEV_MAX_CANDIDATES) return false;
   return candidates.every(candidate => [candidate.key, candidate.provider, candidate.model]
-    .every(value => value.length > 0 && value.length <= JEV_MAX_CANDIDATE_FIELD_CHARS));
+    .every(value => value.length > 0 && value.length <= JEV_MAX_CANDIDATE_FIELD_CHARS)
+    && (candidate.modelProfile === undefined
+      || (typeof candidate.modelProfile === "string" && candidate.modelProfile.length <= 512)));
 }
 
 function modelProfile(candidate: JevCandidate): string {
@@ -566,7 +577,7 @@ export async function resolveJevDecision(options: ResolveJevDecisionOptions): Pr
 
   let requestBody: string;
   try {
-    const state = buildJevState(options.body);
+    const state = buildJevState(options.body, options.candidates);
     if (!hasJevDecisionState(state)) return failed("no_state");
     requestBody = JSON.stringify({
       model: JEV_MODEL,
