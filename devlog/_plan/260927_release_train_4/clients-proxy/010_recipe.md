@@ -66,7 +66,8 @@ against that Git object exited 0 at 108 lines. C-phase implementation review
 then required two source-grounded corrections to the final copy: redirecting
 Codex's SQLite home and disabling resume-history sync in the disposable
 configuration, and activating Lab at startup before a separately authorized
-live-route run. The final recipe therefore intentionally differs from the
+live-route run. The isolation instructions also require `HOME` to point into
+the disposable scratch root. The final recipe therefore intentionally differs from the
 source PR. `AGENTS.md:212` links it beside
 the operating reference. The same independent A reviewer first found that
 an unstaged whitespace check would miss a staged change and the privacy scan

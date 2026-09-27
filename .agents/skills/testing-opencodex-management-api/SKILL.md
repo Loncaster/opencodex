@@ -15,7 +15,9 @@ from the OS home's `.zshrc`; `CLAUDE_CONFIG_DIR` does not redirect that file.
 Raycast integration can also update existing OpenCodex-owned entries under the OS home.
 A temporary client directory alone is therefore not a complete isolation boundary.
 
-Within the disposable environment, allocate a unique scratch directory and set all of
+Within the disposable environment, allocate a unique scratch directory and set `HOME`
+to a fresh directory inside it before startup. A `HOME` override in a normal desktop
+account is not a substitute for the disposable account, container, or VM. Set all of
 `OPENCODEX_HOME`, `CODEX_HOME`, `CODEX_SQLITE_HOME`, `GROK_HOME`, `CLAUDE_CONFIG_DIR`, and
 `OPENCODEX_CLAUDE_DESKTOP_CONFIG_DIR` to distinct directories inside it before startup.
 Confirm the effective OS home belongs to the disposable account. Do not copy personal
