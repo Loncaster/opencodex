@@ -103,7 +103,7 @@ describe("memory phase detection", () => {
     expect(detectMemoryModelPhase(body(), new Headers({ "x-openai-subagent": "collab_spawn" }))).toBeNull();
     expect(detectMemoryModelPhase(body(), new Headers({ "x-openai-subagent": "review" }))).toBeNull();
     // Malformed client metadata is not absent metadata: the header fallback stays closed.
-    for (const malformed of ["bad", 42, ["x"], true]) {
+    for (const malformed of ["bad", 42, ["x"], true, null]) {
       expect(detectMemoryModelPhase(
         { ...body("gpt-5.6-terra"), client_metadata: malformed },
         new Headers({ "x-openai-subagent": "memory_consolidation" }),
