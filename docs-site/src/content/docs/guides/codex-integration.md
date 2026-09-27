@@ -1044,12 +1044,16 @@ and rollout are intact. A compatible list client can send `modelProviders: []` t
 providers. OpenCodex cannot rewrite that RPC because the remote client talks directly to Codex's
 native app-server rather than the inference proxy.
 
-`ocx sync` and `ocx start` warn after they successfully select a provider-table route, and the
-dashboard shows the same limitation once either the authless Desktop or client-compaction switch is
-enabled. It appears once even when both preferences are stored. A user-owned root URL that prevents
-OpenCodex routing does not produce the warning. The warning is not a migration: OpenCodex does not edit provider tags merely to influence a
-client-side list filter. Verify the conversation in native Codex and the app-server/client version;
-do not rewrite paginated history to make a remote list include it.
+`ocx sync` and `ocx start` include the warning when they apply a provider-table route. If a
+user-owned root URL sends the command down the no-routing branch, the CLI omits the warning. In
+client-compaction mode, the CLI can retain that URL, apply the `opencodex` provider table, and
+include the warning. The dashboard shows a separate preference hint when either setting is enabled.
+It appears once if both settings are enabled, regardless of the root URL. The hint reports enabled
+preferences; it does not mean Authless Desktop is effective on the current route. Authless Desktop
+applies only to effective loopback authless routing and is ignored for remote-client routing or
+listeners that require an admission header. The warning is not a migration: OpenCodex does not edit
+provider tags merely to influence a client-side list filter. Verify the conversation in native Codex
+and the app-server/client version; do not rewrite paginated history to make a remote list include it.
 
 Do not rewrite an active paginated rollout or thread row to migrate those conversations yourself. Close the affected conversation before any recovery, and report the exact error and versions without uploading private history. A backup or a successful script alone does not prove the conversation is visible again. Check the restored conversation in Codex after reopening.
 
