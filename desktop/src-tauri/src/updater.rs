@@ -422,6 +422,7 @@ pub async fn install(app: &AppHandle, update: Update) -> Result<(), String> {
 
 /// Hand a failed install back to a running app. True when the drain had already stopped the
 /// runtime, so the startup sequence has to bring one back; a drain that failed left it running.
+/// Intent captured before the drain and a newer startup retry are both authoritative.
 fn after_install_failure(coordinator: &ExitCoordinator) -> bool {
     coordinator.abort_restart()
         == Some(AbortedRestart {
@@ -551,6 +552,13 @@ mod tests {
             assert!(!coordinator.supervision_allowed());
             assert_eq!(coordinator.decision(), ExitDecision::Hide);
         }
+
+        // A newer retry wins over the stopped intent that the update captured at claim time.
+        coordinator.claim_drain(ExitReason::CoordinatedRestart);
+        coordinator.resume();
+        coordinator.finish_drain(DrainVerdict::Drained);
+        assert!(after_install_failure(&coordinator));
+        assert!(coordinator.supervision_allowed());
     }
 
     #[test]

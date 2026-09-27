@@ -150,7 +150,7 @@ pub struct Supervision {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AbortedRestart {
     pub phase: ExitPhase,
-    /// The person's intent before the update temporarily suppressed supervision.
+    /// Whether the person wanted a runtime before the drain or requested one while it ran.
     pub runtime_was_wanted: bool,
 }
 
@@ -277,8 +277,10 @@ impl ExitCoordinator {
     /// An update drains before it installs. When the install then fails, or the drain itself did,
     /// the drain's phase used to be the end of the road: `Drained` is terminal, so no runtime could
     /// be started again and a bare window close quit the app. This returns the app to `Idle` with
-    /// no claimed reason and restores the runtime intent the update temporarily suppressed. It
-    /// touches nothing unless an update's restart holds the phase: a quit is never aborted, and a
+    /// no claimed reason and restores the runtime intent the update temporarily suppressed. A
+    /// retry requested while the drain was in flight wins too: aborting an older update must not
+    /// overwrite newer user intent. It touches nothing unless an update's restart holds the phase:
+    /// a quit is never aborted, and a
     /// drain still running belongs to whoever runs it. Returns the phase and restored intent.
     pub fn abort_restart(&self) -> Option<AbortedRestart> {
         let mut inner = self.inner();
@@ -294,7 +296,10 @@ impl ExitCoordinator {
         inner.phase = ExitPhase::Idle;
         inner.reason = None;
         inner.deferred = false;
-        let runtime_was_wanted = inner.restart_wanted.take().unwrap_or(false);
+        // `resume` can arrive after the update captured its original intent. Preserve that newer
+        // request as well as the older snapshot; otherwise the abort races the startup retry and
+        // can leave a runtime stopped even though the person just asked for it.
+        let runtime_was_wanted = inner.wanted || inner.restart_wanted.take().unwrap_or(false);
         inner.wanted = runtime_was_wanted;
         Some(AbortedRestart {
             phase: left,
@@ -770,6 +775,32 @@ mod tests {
         assert_eq!(coordinator.phase(), ExitPhase::Idle);
         assert_eq!(coordinator.decision(), ExitDecision::Hide);
         assert!(!coordinator.supervision_allowed());
+    }
+
+    #[test]
+    fn a_startup_retry_during_an_update_drain_is_not_overwritten_by_abort() {
+        let coordinator = ExitCoordinator::new();
+        coordinator.set_tray(TrayAvailability::Available);
+        assert!(coordinator.begin_stop());
+        assert_eq!(coordinator.finish_stop(), None);
+        assert!(!coordinator.supervision().wanted);
+
+        assert_eq!(
+            coordinator.claim_drain(ExitReason::CoordinatedRestart),
+            Some(ExitReason::CoordinatedRestart)
+        );
+        coordinator.resume();
+        // The ending claim still prevents supervision until the failed update is handed back.
+        assert!(!coordinator.supervision_allowed());
+        coordinator.finish_drain(DrainVerdict::Drained);
+        assert_eq!(
+            coordinator.abort_restart(),
+            Some(AbortedRestart {
+                phase: ExitPhase::Drained,
+                runtime_was_wanted: true,
+            })
+        );
+        assert!(coordinator.supervision_allowed());
     }
 
     #[test]

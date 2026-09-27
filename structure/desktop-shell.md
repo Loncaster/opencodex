@@ -168,10 +168,11 @@ restart asked for after `install` is never reached, and the package would be rep
 runtime still serving out of those files. A drain that did not complete refuses the install and
 leaves the update pending. Neither that refusal nor an install that fails after the drain strands
 the app: `ExitCoordinator::abort_restart` takes a coordinated restart's settled drain phase back to
-idle with no claimed reason, so a close hides again and Quit works, and when the drain had stopped
-the runtime **and it was wanted before the update**, the startup sequence brings one back in recovery
-mode. A runtime already stopped from the tray stays stopped after a failed update. A quit's drain is
-never aborted.
+idle with no claimed reason, so a close hides again and Quit works. When the drain had stopped the
+runtime and it was wanted before the update **or** requested again while draining, the startup
+sequence brings one back in recovery mode. A runtime already stopped from the tray stays stopped after a failed update unless the person
+explicitly requests startup while that update drain is in flight; that newer request wins over the
+captured stopped intent. A quit's drain is never aborted.
 
 > Decision record: [ADR-6033](decisions/ADR-6033-desktop-update-intent.md)
 
