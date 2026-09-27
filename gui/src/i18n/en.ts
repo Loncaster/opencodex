@@ -2863,7 +2863,7 @@ export const en = {
   "cws.jev.modelProfile": "Additional model notes for JEV",
   "cws.jev.modelProfilePlaceholder": "Optional: leave blank for no additional note.",
   "cws.jev.modelProfileHint": "Optional notes that supplement (never replace) the built-in standard profile: capability, context, and relative subscription cost. Sent to TypeSafe per JEV decision.",
-  "cws.err.invalidModelProfile": "Model notes must be at most 512 characters and contain no control characters.",
+  "cws.err.invalidModelProfile": "Model notes must be at most 512 characters; line breaks and tabs are the only control characters allowed.",
   "cws.jev.allowedEfforts": "JEV may select",
   "cws.jev.efforts": "Reasoning efforts: {efforts}",
   "cws.jev.effortsUnknown": "Reasoning efforts not advertised",

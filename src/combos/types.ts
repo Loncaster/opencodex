@@ -342,7 +342,7 @@ export function comboConfigIssues(
         || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(target.modelProfile))) {
       issues.push({
         path: ["targets", i, "modelProfile"],
-        message: `targets[${i}].modelProfile must be a non-empty string of at most 512 characters without control characters`,
+        message: `targets[${i}].modelProfile must be a non-empty string of at most 512 characters; only tab, line feed and carriage return are allowed among control characters`,
       });
     }
 
