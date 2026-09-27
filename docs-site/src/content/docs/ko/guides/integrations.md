@@ -1,9 +1,9 @@
 ---
 title: 연동
-description: 대시보드에서 OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo, Cline CLI를 opencodex에 연결합니다. 클라이언트마다 스위치가 하나씩 있으며 기록 전마다 백업합니다.
+description: 대시보드에서 OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo, Cline CLI와 Kilo를 opencodex에 연결합니다. 클라이언트마다 스위치가 하나씩 있으며 기록 전마다 백업합니다.
 ---
 
-**Integrations** 탭은 클라이언트의 설정 파일에 opencodex 프로바이더 블록을 쓰고 다시 제거합니다. 다음 15개 클라이언트는 각각 스위치로 관리합니다.
+**Integrations** 탭은 클라이언트의 설정 파일에 opencodex 프로바이더 블록을 쓰고 다시 제거합니다. 다음 16개 클라이언트는 각각 스위치로 관리합니다.
 
 | 클라이언트 | 설정 파일 | 형식 | 변경 적용 시점 | 자격 증명 |
 |---|---|---|---|---|
@@ -22,6 +22,7 @@ description: 대시보드에서 OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, 
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 저장 즉시 — Raycast가 파일을 감시함 | 없음 — 루프백 전용 |
 | omo | `~/.omo/agent/models.json` | JSON | 새 세션에서 | 루프백 자리표시자 |
 | Cline CLI | `~/.cline/data/settings/providers.json` 및 같은 위치의 `models.json` | JSON 파일 쌍 | Cline을 중지하고 다시 시작한 뒤 | 루프백 자리표시자 |
+| Kilo | `~/.config/kilo`에서 먼저 존재하는 `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json`, `config.json` (`XDG_CONFIG_HOME`로 디렉터리 변경 가능, 모두 없으면 `kilo.jsonc` 생성) | JSONC | 새 세션에서 | `OPENCODEX_KILO_API_KEY` |
 
 생성된 카탈로그에는 각 프로바이더 선택에서 활성화된 모델만 들어갑니다. Pi와 Aside를 포함한 다운로드와 관리형 연동 모두에 적용됩니다. 관리 모델 목록에는 전체 모델이 계속 표시되어 추가 모델을 활성화할 수 있습니다.
 
@@ -213,6 +214,21 @@ ocx integration client restore --op <operation-id>
 Undo는 원래 없던 파일까지 포함해 **두 원본 바이트 문자열 모두** 복원합니다. 작업 후 편집된 내용이 있으면 기존의 명시적 `--confirm-drift`가 필요하며 편집된 파일 쌍도 먼저 백업합니다. 이미 차지된 OpenCodex 항목에는 기존 `--overwrite-conflict` 동의가 필요합니다. Disable은 관리형 항목 두 개를 제거하며 이전 외부 항목을 복원하지는 않습니다. 그럴 때는 Undo를 사용하세요. 스냅샷 보관과 만료에는 다른 연동과 같은 규칙이 적용됩니다.
 
 다운로드되는 `cline-config-bundle.json`에는 두 네이티브 문서 구성 요소가 있습니다. `providers.json`용 `settings`와 `models.json`용 `catalog`입니다. 번들 자체가 Cline 설정 파일은 아닙니다. 저널을 남기는 병합과 롤백에는 연동 명령을 권장합니다. 생성된 연동은 원격 수용 연결을 지원하지 않으며 인증이 없는 루프백 접근이 필요합니다.
+
+## Kilo
+
+Kilo CLI, VS Code, JetBrains는 전역 설정을 공유합니다. 이 연동은 `~/.config/kilo` 아래의 `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json`, `config.json` 중 먼저 존재하는 파일에 `provider.opencodex`를 씁니다. `XDG_CONFIG_HOME`로 이 디렉터리를 옮길 수 있습니다. 후보 파일이 없으면 `kilo.jsonc`를 만듭니다. 프로젝트 설정은 수정하지 않습니다.
+
+Kilo는 이 전역 파일을 모두 병합합니다. 다른 후보 파일에도 `provider.opencodex`가 있으면 상태에 충돌 파일을 표시하고 적용과 교체를 거부합니다. 연동을 켜기 전에 해당 파일에서 `provider.opencodex`를 제거하세요. 이미 소유한 파일의 블록은 충돌 중에도 비활성화할 수 있습니다. 읽을 수 없거나 안전하지 않은 후보 파일도 쓰기를 막습니다.
+
+관리하는 부분은 OpenCode V1 형식의 `provider.opencodex`(`npm`, `options`, `models`)뿐입니다. OpenCode V2의 `providers` 키는 내보내지 않습니다. `$schema`, `model`, `enabled_providers`, MCP 등의 키는 사용자가 관리합니다. 적용한 뒤 Kilo에서 `opencodex/<provider/model>`을 선택하세요.
+
+루프백에서는 `options.apiKey`로 `{env:OPENCODEX_KILO_API_KEY}`를 사용합니다. 루프백이 아닌 바인드에서는 인증을 `options.headers["x-opencodex-api-key"]`로 옮기며 실제 키를 저장하지 않습니다. 적용 시 전역 파일 전체를 보기 좋은 JSON으로 다시 쓰므로 다른 키의 주석과 후행 쉼표는 보존되지 않습니다. Kilo는 자동 카탈로그 갱신 대상이 아닙니다. 라우팅 모델 선택을 바꾼 뒤에는 명시적으로 갱신하세요.
+
+```bash
+ocx integration client enable --client kilo
+ocx export --client kilo --out ./kilo.jsonc
+```
 
 ## GitHub Copilot 앱
 

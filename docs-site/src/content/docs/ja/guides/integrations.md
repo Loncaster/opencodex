@@ -1,9 +1,9 @@
 ---
 title: クライアント統合
-description: ダッシュボードから opencodex を OpenCode、Pi、OMP、Hermes、OpenClaw、Kimi Code、gjc、DeepSeek Harness、MiniMax Code、ZCode、Prime Agent、Aside、Raycast、omo、Cline CLI に接続します。クライアントごとにスイッチがあり、書き込み前には必ずバックアップを取ります。
+description: ダッシュボードから opencodex を OpenCode、Pi、OMP、Hermes、OpenClaw、Kimi Code、gjc、DeepSeek Harness、MiniMax Code、ZCode、Prime Agent、Aside、Raycast、omo、Cline CLI、Kilo に接続します。クライアントごとにスイッチがあり、書き込み前には必ずバックアップを取ります。
 ---
 
-**Integrations** タブは、各クライアントの設定ファイルに opencodex のプロバイダーブロックを書き込み、必要に応じて削除します。次の 15 クライアントは、それぞれのスイッチで管理できます。
+**Integrations** タブは、各クライアントの設定ファイルに opencodex のプロバイダーブロックを書き込み、必要に応じて削除します。次の 16 クライアントは、それぞれのスイッチで管理できます。
 
 | クライアント | 設定ファイル | 形式 | 変更が反映される時点 | 認証情報 |
 |---|---|---|---|---|
@@ -22,6 +22,7 @@ description: ダッシュボードから opencodex を OpenCode、Pi、OMP、Her
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 保存後すぐ。Raycast がファイルを監視 | なし。ループバックのみ |
 | omo | `~/.omo/agent/models.json` | JSON | 新しいセッション | ループバック用プレースホルダー |
 | Cline CLI | `~/.cline/data/settings/providers.json` と同階層の `models.json` | JSON のペア | Cline の停止と再起動後 | ループバック用プレースホルダー |
+| Kilo | `~/.config/kilo` 内で最初に存在する `kilo.jsonc`、`kilo.json`、`opencode.jsonc`、`opencode.json`、`config.json`（`XDG_CONFIG_HOME` でディレクトリを変更可能。どれもなければ `kilo.jsonc` を作成） | JSONC | 新しいセッション | `OPENCODEX_KILO_API_KEY` |
 
 生成されるカタログには、各プロバイダーの選択で有効なモデルのみが含まれます。これはダウンロードと管理対象の統合の両方に適用され、Pi と Aside も対象です。管理画面のモデル一覧にはすべてのモデルが表示されるため、追加のモデルを有効にできます。
 
@@ -215,6 +216,21 @@ ocx integration client restore --op <operation-id>
 Undo は、もともと存在しなかったファイルも含め、**元の両方のバイト列**を復元します。操作後の編集には、既存の明示的な `--confirm-drift` が必要で、編集済みのペアも先にバックアップされます。すでに使われている OpenCodex 項目には、既存の `--overwrite-conflict` による同意が必要です。Disable は 2 つの管理対象項目を削除しますが、以前の他者の項目は復元しません。その場合は Undo を使ってください。スナップショットの保持件数と期限は他の統合と同じ規則です。
 
 ダウンロードされる `cline-config-bundle.json` には、`providers.json` 用の `settings` と `models.json` 用の `catalog` という 2 つのネイティブ文書要素が含まれます。それ自体は Cline の設定ファイルではありません。ジャーナル付きのマージとロールバックには統合コマンドを使ってください。生成された統合はリモートの受け入れ認証に対応せず、認証不要のループバックアクセスが必要です。
+
+## Kilo
+
+Kilo CLI、VS Code、JetBrains は同じグローバル設定を共有します。この統合は `~/.config/kilo` 内の `kilo.jsonc`、`kilo.json`、`opencode.jsonc`、`opencode.json`、`config.json` のうち最初に存在するファイルに `provider.opencodex` を書き込みます。`XDG_CONFIG_HOME` でこのディレクトリを変更できます。候補がなければ `kilo.jsonc` を作成します。プロジェクト設定には書き込みません。
+
+Kilo はこれらのグローバルファイルをすべてマージします。別の候補も `provider.opencodex` を定義する場合、状態に競合ファイルが表示され、適用と置換は拒否されます。有効化する前に、そのファイルから `provider.opencodex` を削除してください。所有済みファイルの無効化は競合があっても実行できます。読み取れない候補や安全に扱えない候補も書き込みを妨げます。
+
+管理対象は OpenCode V1 形式の `provider.opencodex`（`npm`、`options`、`models`）だけです。OpenCode V2 の `providers` は出力しません。`$schema`、`model`、`enabled_providers`、MCP などのキーはユーザーが管理します。適用後、Kilo で `opencodex/<provider/model>` を選択してください。
+
+ループバックでは `options.apiKey` に `{env:OPENCODEX_KILO_API_KEY}` を使います。ループバック以外へのバインドでは認証を `options.headers["x-opencodex-api-key"]` に移し、実際のキーは保存しません。適用時はグローバルファイル全体を整形済み JSON として書き直すため、他のキーのコメントと末尾カンマは保持されません。Kilo は自動カタログ更新の対象外です。ルーティング対象のモデル選択を変更したら、明示的に更新してください。
+
+```bash
+ocx integration client enable --client kilo
+ocx export --client kilo --out ./kilo.jsonc
+```
 
 ## GitHub Copilot アプリ
 

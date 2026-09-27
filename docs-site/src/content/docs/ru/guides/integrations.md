@@ -1,10 +1,10 @@
 ---
 title: Интеграции
-description: Подключайте opencodex к OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo и Cline CLI из дашборда — отдельный переключатель для каждого клиента и резервная копия перед каждой записью.
+description: Подключайте opencodex к OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo, Cline CLI и Kilo из дашборда — отдельный переключатель для каждого клиента и резервная копия перед каждой записью.
 ---
 
 Вкладка **Integrations** записывает блок провайдера opencodex в собственный файл
-конфигурации клиента и при необходимости удаляет его. Так работают пятнадцать
+конфигурации клиента и при необходимости удаляет его. Так работают шестнадцать
 клиентов, у каждого свой переключатель:
 
 | Клиент | Файл конфигурации | Формат | Когда изменение начинает действовать | Учётные данные |
@@ -24,6 +24,7 @@ description: Подключайте opencodex к OpenCode, Pi, OMP, Hermes, Open
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | сразу после сохранения — Raycast следит за файлом | нет — только loopback |
 | omo | `~/.omo/agent/models.json` | JSON | в новых сессиях | заглушка для loopback |
 | Cline CLI | `~/.cline/data/settings/providers.json` и соседний `models.json` | пара JSON | после остановки и повторного запуска Cline | заглушка для loopback |
+| Kilo | первый существующий файл среди `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` и `config.json` в `~/.config/kilo` (`XDG_CONFIG_HOME` переносит каталог; если файлов нет, создаётся `kilo.jsonc`) | JSONC | в новых сессиях | `OPENCODEX_KILO_API_KEY` |
 
 Создаваемые каталоги включают только модели, включённые в настройках каждого
 провайдера. Это относится и к скачиваемым файлам, и к управляемым интеграциям,
@@ -529,6 +530,21 @@ OpenCodex требует явного `--overwrite-conflict`. Отключени
 отката лучше использовать команду интеграции. Создаваемая интеграция не
 поддерживает удалённую настройку допуска и требует loopback-доступа без
 аутентификации.
+
+## Kilo
+
+Kilo CLI, VS Code и JetBrains используют общую глобальную конфигурацию. Интеграция записывает `provider.opencodex` в первый существующий файл среди `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` и `config.json` в `~/.config/kilo`. Переменная `XDG_CONFIG_HOME` переносит этот каталог. Если файлов нет, создаётся `kilo.jsonc`. Конфигурация проекта не изменяется.
+
+Kilo объединяет все эти глобальные файлы. Если другой файл-кандидат тоже определяет `provider.opencodex`, статус перечисляет конфликтующие файлы, а применение и замена отклоняются. Перед включением удалите `provider.opencodex` из этих файлов. Отключение уже принадлежащего OpenCodex блока доступно и при таком конфликте. Нечитаемый или небезопасный файл-кандидат также блокирует запись.
+
+Интеграции принадлежит только `provider.opencodex` в формате OpenCode V1 (`npm`, `options`, `models`). Поле OpenCode V2 `providers` не создаётся. `$schema`, `model`, `enabled_providers`, MCP и прочие ключи остаются под управлением пользователя. После применения выберите в Kilo `opencodex/<provider/model>`.
+
+Для loopback значение `options.apiKey` — `{env:OPENCODEX_KILO_API_KEY}`. При привязке не к loopback авторизация переносится в `options.headers["x-opencodex-api-key"]`; настоящий ключ не записывается. Применение переписывает весь глобальный файл как форматированный JSON, поэтому комментарии и завершающие запятые в других ключах не сохраняются. Kilo не участвует в автоматическом обновлении каталога; после изменения выбора маршрутизируемых моделей обновите интеграцию явно.
+
+```bash
+ocx integration client enable --client kilo
+ocx export --client kilo --out ./kilo.jsonc
+```
 
 ## Приложение GitHub Copilot
 

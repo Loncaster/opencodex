@@ -65,6 +65,7 @@ export interface IntegrationStatus {
   lastOpId?: string;
   reason?: IntegrationReason;
   conflictPaths?: string[];
+  candidateFailurePath?: string;
   /**
    * The store this client reads instead of `configPath`, when one exists.
    *
@@ -79,6 +80,14 @@ export interface IntegrationStatus {
   profileId?: number;
   enabled?: boolean;
   raycast?: RaycastInstall;
+}
+
+/** A candidate issue can block adding Kilo while removal still targets its recorded file. */
+export function canDisableKiloWithCandidateIssue(status: IntegrationStatus): boolean {
+  return status.clientId === "kilo" && !!status.lastOpId
+    && (status.reason === "candidate-conflict"
+      || (status.state === "unsafe" && !!status.candidateFailurePath
+        && status.candidateFailurePath !== status.configPath));
 }
 
 export interface IntegrationStateListEnvelope {

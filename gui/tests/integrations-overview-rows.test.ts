@@ -234,6 +234,26 @@ test("file clients keep their existing badge and applied semantics", () => {
   expect(counts.stale).toBe(1);
 });
 
+test("an owned Kilo block remains switch-on while a later candidate conflicts", () => {
+  const rows = buildOverviewRows(sources({ clients: [
+    fileStatus({ clientId: "kilo", state: "conflict", reason: "candidate-conflict", lastOpId: "owned-operation" }),
+    fileStatus({ clientId: "hermes", state: "conflict", reason: "foreign-edit", lastOpId: "other-operation" }),
+  ] }));
+  expect(rowById(rows, "kilo")).toMatchObject({ state: "conflict", applied: true });
+  expect(rowById(rows, "hermes").applied).toBe(false);
+
+  const laterUnsafe = buildOverviewRows(sources({ clients: [fileStatus({
+    clientId: "kilo", state: "unsafe", reason: "unparseable", configPath: "/tmp/kilo.jsonc",
+    candidateFailurePath: "/tmp/kilo.json", lastOpId: "owned-operation",
+  })] }));
+  expect(rowById(laterUnsafe, "kilo").applied).toBe(true);
+  const selectedUnsafe = buildOverviewRows(sources({ clients: [fileStatus({
+    clientId: "kilo", state: "unsafe", reason: "unparseable", configPath: "/tmp/config.json",
+    candidateFailurePath: "/tmp/config.json", lastOpId: "owned-operation",
+  })] }));
+  expect(rowById(selectedUnsafe, "kilo").applied).toBe(false);
+});
+
 test("every client counts toward the summary, not just the file clients", () => {
   const rows = buildOverviewRows(sources({
     clients: [fileStatus({ clientId: "opencode", state: "current" })],

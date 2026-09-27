@@ -2059,7 +2059,7 @@ export const fr: Record<TKey, string> = {
   "integrations.status.notInstalled": "Non installé",
   "integrations.status.appliedAt": "Appliqué",
   "integrations.status.supersededStore": "Ce client lit désormais ses fournisseurs depuis {path}, un fichier qu'opencodex n'écrit pas : l'activer ici ne changerait rien à ce qu'il charge.",
-  "integrations.status.candidateConflict": "Un autre fichier de configuration Kilo, {path}, définit aussi provider.opencodex. Supprimez provider.opencodex de ce fichier avant de continuer.",
+  "integrations.status.candidateConflict": "Un autre fichier de configuration Kilo, {path}, définit aussi provider.opencodex. Supprimez provider.opencodex de ce fichier avant d'appliquer.",
   "integrations.status.backup": "Sauvegarde",
   "integrations.status.lastRestore": "Dernière restauration",
   "integrations.status.unknown": "Inconnu",

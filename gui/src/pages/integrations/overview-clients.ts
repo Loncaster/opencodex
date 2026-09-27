@@ -16,6 +16,7 @@ import type { TKey } from "../../i18n/shared";
 import type { VisualIntegrationState } from "./IntegrationStateBadge";
 import {
   FILE_INTEGRATION_CLIENTS,
+  canDisableKiloWithCandidateIssue,
   type FileIntegrationClientId,
   type IntegrationJournalRow,
   type IntegrationStatus,
@@ -520,7 +521,7 @@ function fileRow(status: IntegrationStatus): OverviewRow {
     // of its file state; do the same here so the grid and the count agree.
     state: status.installed ? status.state : "not-installed",
     installed: status.installed,
-    applied: status.installed && isAppliedState(status.state),
+    applied: status.installed && (isAppliedState(status.state) || canDisableKiloWithCandidateIssue(status)),
     detail: status.configPath,
     detailKey: null,
     detailVars: null,

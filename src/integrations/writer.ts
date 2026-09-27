@@ -232,8 +232,8 @@ function sourcePreservingFragmentValue(
  * and Cline transaction recovery both write. Translating the planner's refusal into WriteRefused
  * here keeps the planner free of any dependency on this module's result type.
  */
-function preflight(input: IntegrationWriteInput) {
-  const observed = observeIntegration(input, { maintenance: true, recover: true });
+function preflight(input: IntegrationWriteInput, operation: "apply" | "disable") {
+  const observed = observeIntegration(input, { maintenance: true, recover: true }, operation);
   if (!observed.failed) return observed;
   const { reason, state, message, snapshotPath, residual } = observed.failed;
   const refused = refuse(input.clientId, reason, state, message, snapshotPath);
@@ -258,7 +258,7 @@ function applyOrRefreshIntegration(
   allowAbsent: boolean,
   conflictPolicy: ConflictPolicy = "refuse",
 ): WriteOutcome {
-  const pre = preflight(input);
+  const pre = preflight(input, "apply");
   if (pre.failed) return pre.failed;
   const { store, io, clientId, spec, target, configPath, detectDir, before, parsed, contribution, record, classified } = pre;
 
@@ -511,7 +511,7 @@ export function refreshIntegration(input: IntegrationWriteInput): WriteOutcome {
 }
 
 export function disableIntegration(input: IntegrationWriteInput): WriteOutcome {
-  const pre = preflight(input);
+  const pre = preflight(input, "disable");
   if (pre.failed) return pre.failed;
   const { store, io, clientId, spec, target, configPath, before, parsed, record, classified } = pre;
 

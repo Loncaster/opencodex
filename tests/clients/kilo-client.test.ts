@@ -229,6 +229,56 @@ describe("kilo JSONC apply/disable/restore", () => {
     expect(readIntegrationState(writeInput()).conflictPaths).toEqual(paths);
   });
 
+  test("an owned block can be disabled despite a later competing candidate", () => {
+    const dir = INTEGRATION_CLIENTS.kilo.detectDir({}, home);
+    mkdirSync(dir, { recursive: true });
+    const ownedPath = join(dir, "kilo.jsonc");
+    const competingPath = join(dir, "opencode.jsonc");
+    writeFileSync(ownedPath, '{"model":"keep"}\n');
+    const input = writeInput();
+    expect(applyIntegration(input).ok).toBe(true);
+    const ownedText = readFileSync(ownedPath, "utf8");
+    const competingText = '{"provider":{"opencodex":{"name":"other"}}}\n';
+    writeFileSync(competingPath, competingText);
+
+    expect(readIntegrationState(input)).toMatchObject({
+      state: "conflict", reason: "candidate-conflict", configPath: ownedPath,
+      conflictPaths: [competingPath], lastOpId: expect.any(String),
+    });
+    for (const operation of ["apply", "overwrite"] as const) {
+      expect(previewIntegration(input, { operation })).toMatchObject({ canApply: false, refusalReason: "conflict" });
+    }
+    expect(applyIntegration(input)).toMatchObject({ ok: false, reason: "conflict" });
+    expect(overwriteIntegration(input)).toMatchObject({ ok: false, reason: "conflict" });
+    expect(readFileSync(ownedPath, "utf8")).toBe(ownedText);
+
+    expect(previewIntegration(input, { operation: "disable" }).canApply).toBe(true);
+    expect(disableIntegration(input)).toMatchObject({ ok: true, changed: true });
+    expect(JSON.parse(readFileSync(ownedPath, "utf8"))).toEqual({ model: "keep" });
+    expect(readFileSync(competingPath, "utf8")).toBe(competingText);
+    expect(readIntegrationState(input)).toMatchObject({ state: "conflict", reason: "candidate-conflict" });
+  });
+
+  test("an unparseable later candidate does not strand an owned block", () => {
+    const dir = INTEGRATION_CLIENTS.kilo.detectDir({}, home);
+    mkdirSync(dir, { recursive: true });
+    const ownedPath = join(dir, "kilo.jsonc");
+    const laterPath = join(dir, "opencode.jsonc");
+    writeFileSync(ownedPath, "{}\n");
+    const input = writeInput();
+    expect(applyIntegration(input).ok).toBe(true);
+    writeFileSync(laterPath, "{broken");
+    expect(readIntegrationState(input)).toMatchObject({
+      state: "unsafe", reason: "unparseable", candidateFailurePath: laterPath,
+      lastOpId: expect.any(String),
+    });
+    expect(previewIntegration(input, { operation: "apply" }).canApply).toBe(false);
+    expect(previewIntegration(input, { operation: "disable" }).canApply).toBe(true);
+    expect(disableIntegration(input)).toMatchObject({ ok: true, changed: true });
+    expect(JSON.parse(readFileSync(ownedPath, "utf8"))).toEqual({});
+    expect(readFileSync(laterPath, "utf8")).toBe("{broken");
+  });
+
   test("a later provider block refuses even when the first candidate has none", () => {
     const dir = INTEGRATION_CLIENTS.kilo.detectDir({}, home);
     mkdirSync(dir, { recursive: true });

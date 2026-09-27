@@ -2127,7 +2127,7 @@ export const en = {
   "integrations.status.notInstalled": "Not installed",
   "integrations.status.appliedAt": "Applied",
   "integrations.status.supersededStore": "This client now reads its providers from {path}, which opencodex does not write, so enabling it here would change nothing it loads.",
-  "integrations.status.candidateConflict": "Another Kilo config file, {path}, also defines provider.opencodex. Remove provider.opencodex from that file before continuing.",
+  "integrations.status.candidateConflict": "Another Kilo config file, {path}, also defines provider.opencodex. Remove provider.opencodex from that file before applying.",
   "integrations.status.backup": "Backup",
   "integrations.status.lastRestore": "Last restore",
   "integrations.status.unknown": "Unknown",

@@ -32,7 +32,7 @@ parsing and ownership rules below.
 | `src/integrations/registry.ts` | Canonical config/detection paths, current-provider-store declarations, source-preserving YAML declarations, writer-lock behavior, and client IDs. |
 | `src/integrations/target.ts` | Which file one operation reads, writes and records, and whether a write there reaches the client. |
 | `src/integrations/config-io.ts` | Bounded file loading and parsing. Values that cannot round-trip through the target serializer are rejected before mutation. |
-| `src/integrations/kilo-candidates.ts` | Inspects all Kilo global config candidates for unsafe files and a competing `provider.opencodex` block before status or mutation. |
+| `src/integrations/kilo-candidates.ts` | Inspects all Kilo global config candidates for unsafe files and a competing `provider.opencodex` block before status or any operation that adds or replaces a block. |
 | `src/integrations/state.ts` | The single `absent` / `current` / `stale` / `conflict` / `unsafe` classifier used by status and every writer operation. |
 | `src/integrations/ownership.ts` | Durable ownership records: file, generated contribution, protected contribution, exact fragment paths, and operation identity. |
 | `src/integrations/ownership-policy.ts` | Client-scoped declarations for fields a client is documented to derive after apply. It must never contain a broad format-wide exemption. |
@@ -385,9 +385,14 @@ commas; serialize rewrites the whole file as pretty JSON, so comments in other k
 not preserved. Kilo is not on the implicit owned-catalog fan-out. Remote admission uses
 the same `{env:OPENCODEX_KILO_API_KEY}` / `x-opencodex-api-key` rule as OpenCode.
 All candidate files are inspected through the no-follow, bounded parser before status or
-mutation. If another candidate defines `provider.opencodex`, status reports a conflict
-with every competing path in `conflictPaths`; preview/apply/overwrite refuse and name
-the selected and competing paths. An unsafe or unparseable candidate also refuses.
+any operation that adds or replaces a block. If another candidate defines
+`provider.opencodex`, status reports a conflict with every competing path in
+`conflictPaths`; preview/apply/overwrite refuse and name the selected and competing
+paths. An unsafe or unparseable candidate also blocks those writes. Disable instead
+classifies the recorded target and removes only a still-owned, unchanged block; a competing
+or unparseable off-target candidate remains untouched. Status retains the candidate issue,
+the recorded owner, and the unsafe candidate's path so the dashboard can offer Disable
+only when that issue is off-target. Restore uses its separate journal and drift checks.
 Apply scans the candidates again after its selected-file compare and before snapshot capture,
 so a competing file introduced during planning is refused before commit.
 

@@ -330,6 +330,8 @@ ocx integration client restore --op <operation-id>
 
 Kilo yalnızca `~/.config/kilo` altındaki ilk mevcut genel dosyada `provider.opencodex` yazar (`XDG_CONFIG_HOME` bu dizini taşır; hiçbir aday yoksa `kilo.jsonc` oluşturulur). Başka bir aday dosya da `provider.opencodex` tanımlıyorsa durum çakışma bildirir ve Uygula işlemi reddedilir. Diğer anahtarlar değişmez. Uygula dosyanın tamamını yeniden yazar; yorumlar ve sondaki virgüller korunmaz. Kilo’da `opencodex/<model>` seçin.
 
+Başka bir aday çakışsa veya ayrıştırılamasa bile Devre Dışı Bırak, kaydedilen dosyadaki OpenCodex'e ait bloğu kaldırabilir; diğer aday dosya değişmez.
+
 ```bash
 ocx integration client enable --client kilo
 ```

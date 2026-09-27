@@ -305,6 +305,8 @@ ocx integration client restore --op <operation-id>
 
 Kilo n’écrit que `provider.opencodex` dans le premier fichier global existant sous `~/.config/kilo` (`XDG_CONFIG_HOME` déplace ce répertoire ; `kilo.jsonc` est créé si aucun candidat n’existe). Si un autre fichier candidat définit aussi `provider.opencodex`, l’état signale un conflit et Appliquer refuse. Les autres clés restent inchangées. Appliquer réécrit tout le fichier ; commentaires et virgules finales ne sont pas conservés. Sélectionnez `opencodex/<modèle>` dans Kilo.
 
+Désactiver peut retirer le bloc appartenant à OpenCodex du fichier enregistré même si un autre candidat est en conflit ou ne peut pas être analysé ; cet autre fichier reste intact.
+
 ```bash
 ocx integration client enable --client kilo
 ```

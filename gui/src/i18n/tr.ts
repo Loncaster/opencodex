@@ -2072,7 +2072,7 @@ export const tr: Record<TKey, string> = {
   "integrations.status.notInstalled": "Yüklü değil",
   "integrations.status.appliedAt": "Uygulandı",
   "integrations.status.supersededStore": "Bu istemci sağlayıcılarını artık {path} dosyasından okuyor; opencodex bu dosyayı yazmadığı için buradan etkinleştirmek istemcinin yüklediklerini değiştirmez.",
-  "integrations.status.candidateConflict": "Başka bir Kilo yapılandırma dosyası olan {path} da provider.opencodex tanımlıyor. Devam etmeden önce bu dosyadan provider.opencodex değerini kaldırın.",
+  "integrations.status.candidateConflict": "Başka bir Kilo yapılandırma dosyası olan {path} da provider.opencodex tanımlıyor. Uygulamadan önce bu dosyadan provider.opencodex değerini kaldırın.",
   "integrations.status.backup": "Yedek",
   "integrations.status.lastRestore": "Son geri yükleme",
   "integrations.status.unknown": "Bilinmiyor",

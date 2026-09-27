@@ -1555,7 +1555,7 @@ export const zh: Record<TKey, string> = {
   "integrations.status.notInstalled": "未安装",
   "integrations.status.appliedAt": "已应用",
   "integrations.status.supersededStore": "此客户端现在从 {path} 读取提供方，而 opencodex 不写入该文件，因此在这里启用不会改变它加载的内容。",
-  "integrations.status.candidateConflict": "另一个 Kilo 配置文件 {path} 也定义了 provider.opencodex。继续之前，请从该文件中移除 provider.opencodex。",
+  "integrations.status.candidateConflict": "另一个 Kilo 配置文件 {path} 也定义了 provider.opencodex。应用之前，请从该文件中移除 provider.opencodex。",
   "integrations.status.backup": "备份",
   "integrations.status.lastRestore": "上次恢复",
   "integrations.status.unknown": "未知",

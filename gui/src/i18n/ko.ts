@@ -1574,7 +1574,7 @@ export const ko: Record<TKey, string> = {
   "integrations.status.notInstalled": "설치되지 않음",
   "integrations.status.appliedAt": "적용",
   "integrations.status.supersededStore": "이 클라이언트는 이제 {path}에서 프로바이더를 읽습니다. opencodex는 이 파일을 쓰지 않으므로 여기서 켜도 클라이언트가 불러오는 내용은 달라지지 않습니다.",
-  "integrations.status.candidateConflict": "다른 Kilo 설정 파일 {path}에도 provider.opencodex가 정의되어 있습니다. 계속하려면 그 파일에서 provider.opencodex를 제거하세요.",
+  "integrations.status.candidateConflict": "다른 Kilo 설정 파일 {path}에도 provider.opencodex가 정의되어 있습니다. 적용하려면 그 파일에서 provider.opencodex를 제거하세요.",
   "integrations.status.backup": "백업",
   "integrations.status.lastRestore": "마지막 복원",
   "integrations.status.unknown": "알 수 없음",

@@ -660,7 +660,7 @@ export function previewIntegration(input: IntegrationWriteInput, request: Previe
   // Restore never reaches the general observation, because the writer's undo path never parses
   // or classifies and a preview that did would answer a different question.
   if (request.operation === "restore") return previewRestore(input, request);
-  const observed = observeIntegration(input, { maintenance: false, recover: false });
+  const observed = observeIntegration(input, { maintenance: false, recover: false }, request.operation);
   if (observed.failed) return unboundPlan(input.clientId, request.operation, observed.failed, request.profileId);
 
   const shared = {
@@ -832,7 +832,11 @@ export interface ObservationEffects {
  * classification rather than two independent reads that can disagree. The ordering of refusals is
  * load-bearing and is preserved exactly as the writer had it.
  */
-export function observeIntegration(input: IntegrationWriteInput, effects: ObservationEffects) {
+export function observeIntegration(
+  input: IntegrationWriteInput,
+  effects: ObservationEffects,
+  operation: Exclude<IntegrationPlanOperation, "restore">,
+) {
   const store = input.store ?? createIntegrationStateStore();
   let io = input.io ?? defaultIntegrationIO(store);
   const clientId = input.clientId;
@@ -892,7 +896,7 @@ export function observeIntegration(input: IntegrationWriteInput, effects: Observ
     return { failed: observationFailure("unsafe", "unsafe", error.message) } as const;
   }
   // Pruning writes, so only a mutation may perform it. Preview reports the state it finds.
-  if (clientId === "kilo") {
+  if (clientId === "kilo" && operation !== "disable") {
     const candidates = inspectKiloCandidates({ io, selectedPath: configPath, env: input.env, home: input.home });
     if (candidates.kind !== "ok") return { failed: candidates.kind === "conflict"
       ? observationFailure("conflict", "conflict", `${configPath} cannot be managed while ${candidates.paths.join(", ")} also defines provider.opencodex`)

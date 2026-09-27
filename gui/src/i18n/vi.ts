@@ -2082,7 +2082,7 @@ export const vi: Record<TKey, string> = {
   "integrations.status.notInstalled": "Chưa cài đặt",
   "integrations.status.appliedAt": "Đã áp dụng",
   "integrations.status.supersededStore": "Máy khách này hiện đọc danh sách nhà cung cấp từ {path}, tệp mà opencodex không ghi, nên bật ở đây sẽ không thay đổi những gì nó tải.",
-  "integrations.status.candidateConflict": "Một tệp cấu hình Kilo khác, {path}, cũng định nghĩa provider.opencodex. Hãy xóa provider.opencodex khỏi tệp đó trước khi tiếp tục.",
+  "integrations.status.candidateConflict": "Một tệp cấu hình Kilo khác, {path}, cũng định nghĩa provider.opencodex. Hãy xóa provider.opencodex khỏi tệp đó trước khi áp dụng.",
   "integrations.status.backup": "Sao lưu",
   "integrations.status.lastRestore": "Lần khôi phục cuối",
   "integrations.status.unknown": "Không xác định",

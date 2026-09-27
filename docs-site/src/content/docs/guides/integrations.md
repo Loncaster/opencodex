@@ -530,7 +530,8 @@ Kilo CLI, VS Code, and JetBrains share one global config. This integration write
 Kilo merges all of these global files. If another candidate also defines
 `provider.opencodex`, status names every competing file and Apply and Replace refuse;
 remove `provider.opencodex` from those files before enabling the integration. An unreadable or unsafe
-candidate also blocks the write.
+candidate also blocks the write. Disable can still remove a block owned in the recorded file
+while another candidate conflicts or cannot be parsed; the other candidate is left untouched.
 
 The owned fragment is only `provider.opencodex` (OpenCode V1 shape: `npm`, `options`,
 `models`). Kilo's published schema has no OpenCode V2 `providers` key, so that block is

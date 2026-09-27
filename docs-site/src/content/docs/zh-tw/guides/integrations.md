@@ -207,6 +207,8 @@ ocx integration client restore --op <operation-id>
 
 Kilo 只會把 `provider.opencodex` 寫入 `~/.config/kilo` 下最先存在的全域檔（`XDG_CONFIG_HOME` 會移動該目錄；若沒有任何候選檔則建立 `kilo.jsonc`）。若另一個候選檔也定義 `provider.opencodex`，狀態會回報衝突且套用會拒絕。其他鍵保持不變。套用會重寫整個檔案，因此不會保留註解與尾隨逗號。請在 Kilo 中選擇 `opencodex/<模型>`。
 
+即使其他候選檔發生衝突或無法剖析，停用仍可移除已記錄檔案中由 OpenCodex 管理的區塊；其他候選檔不會變動。
+
 ```bash
 ocx integration client enable --client kilo
 ```

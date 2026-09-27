@@ -65,6 +65,8 @@ export interface IntegrationStatus {
   reason?: StateReason;
   /** Other Kilo global candidates defining provider.opencodex. */
   conflictPaths?: string[];
+  /** Kilo candidate that could not be inspected; may differ from the owned target. */
+  candidateFailurePath?: string;
   /**
    * The store this client reads instead of `configPath`.
    *
@@ -576,6 +578,8 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
       configPath,
       reason: candidates.kind === "conflict" ? "candidate-conflict" : candidates.why,
       ...(candidates.kind === "conflict" ? { conflictPaths: candidates.paths } : {}),
+      ...(candidates.kind === "unsafe" ? { candidateFailurePath: candidates.path } : {}),
+      ...(record && record.configPath === configPath ? { appliedAt: record.appliedAt, lastOpId: record.opId } : {}),
       ...retention,
     };
   }

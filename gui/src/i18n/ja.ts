@@ -1981,7 +1981,7 @@ export const ja: Record<TKey, string> = {
   "integrations.status.notInstalled": "未インストール",
   "integrations.status.appliedAt": "適用",
   "integrations.status.supersededStore": "このクライアントは現在 {path} からプロバイダーを読み込みます。opencodex はこのファイルを書き込まないため、ここで有効にしても読み込む内容は変わりません。",
-  "integrations.status.candidateConflict": "別の Kilo 設定ファイル {path} にも provider.opencodex が定義されています。続行する前に、そのファイルから provider.opencodex を削除してください。",
+  "integrations.status.candidateConflict": "別の Kilo 設定ファイル {path} にも provider.opencodex が定義されています。適用する前に、そのファイルから provider.opencodex を削除してください。",
   "integrations.status.backup": "バックアップ",
   "integrations.status.lastRestore": "最終復元",
   "integrations.status.unknown": "不明",

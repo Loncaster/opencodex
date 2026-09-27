@@ -15,6 +15,7 @@ import {
   loadIntegrationJournal,
   loadIntegrationState,
   previewIntegrationMutation,
+  canDisableKiloWithCandidateIssue,
   toggleIntegration,
   bindingFor,
   IntegrationApiError,
@@ -263,12 +264,13 @@ export default function FileIntegrationPage({
     );
   }
 
-  const applied = status.state === "current" || status.state === "stale";
+  const removableKiloIssue = canDisableKiloWithCandidateIssue(status);
+  const applied = status.state === "current" || status.state === "stale" || removableKiloIssue;
   const enabled = profileId !== undefined ? status.enabled === true : applied;
   const profileUnavailable = profileId !== undefined && (stateResource.state.showError || stateResource.state.refreshing);
   // A profile may stop future sync even when its file cannot be changed; the
   // writer still refuses unsafe deletion and reports the actual state separately.
-  const locked = (!status.installed || status.state === "conflict" || status.state === "unsafe")
+  const locked = (!status.installed || ((status.state === "conflict" || status.state === "unsafe") && !removableKiloIssue))
     && !(profileId !== undefined && enabled);
 
   return (

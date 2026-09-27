@@ -2053,7 +2053,7 @@ export const ru: Record<TKey, string> = {
   "integrations.status.notInstalled": "Не установлен",
   "integrations.status.appliedAt": "Применено",
   "integrations.status.supersededStore": "Этот клиент теперь читает провайдеров из {path}, а opencodex этот файл не пишет, поэтому включение здесь ничего не изменит в том, что клиент загружает.",
-  "integrations.status.candidateConflict": "Другой файл конфигурации Kilo, {path}, тоже определяет provider.opencodex. Перед продолжением удалите provider.opencodex из этого файла.",
+  "integrations.status.candidateConflict": "Другой файл конфигурации Kilo, {path}, тоже определяет provider.opencodex. Перед применением удалите provider.opencodex из этого файла.",
   "integrations.status.backup": "Резервная копия",
   "integrations.status.lastRestore": "Последнее восстановление",
   "integrations.status.unknown": "Неизвестно",
