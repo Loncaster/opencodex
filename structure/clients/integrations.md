@@ -385,8 +385,9 @@ commas; serialize rewrites the whole file as pretty JSON, so comments in other k
 not preserved. Kilo is not on the implicit owned-catalog fan-out. Remote admission uses
 the same `{env:OPENCODEX_KILO_API_KEY}` / `x-opencodex-api-key` rule as OpenCode.
 All candidate files are inspected through the no-follow, bounded parser before status or
-mutation. If another candidate defines `provider.opencodex`, status reports a conflict and
-preview/apply refuse with both paths named; an unsafe or unparseable candidate also refuses.
+mutation. If another candidate defines `provider.opencodex`, status reports a conflict
+with every competing path in `conflictPaths`; preview/apply/overwrite refuse and name
+the selected and competing paths. An unsafe or unparseable candidate also refuses.
 Apply scans the candidates again after its selected-file compare and before snapshot capture,
 so a competing file introduced during planning is refused before commit.
 

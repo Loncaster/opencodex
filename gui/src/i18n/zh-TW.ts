@@ -2860,6 +2860,7 @@ export const zhTW: Record<TKey, string> = {
   "integrations.status.notInstalled": "未安裝",
   "integrations.status.appliedAt": "已套用",
   "integrations.status.supersededStore": "此用戶端現在從 {path} 讀取供應商，而 opencodex 不會寫入該檔案，因此在這裡啟用不會改變它載入的內容。",
+  "integrations.status.candidateConflict": "另一個 Kilo 設定檔 {path} 也定義了 provider.opencodex。繼續之前，請從該檔案移除 provider.opencodex。",
   "integrations.status.backup": "備份",
   "integrations.status.lastRestore": "上次還原",
   "integrations.status.unknown": "未知",

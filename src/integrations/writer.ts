@@ -439,7 +439,7 @@ function applyOrRefreshIntegration(
   if (clientId === "kilo") {
     const candidates = inspectKiloCandidates({ io, selectedPath: configPath, env: input.env, home: input.home });
     if (candidates.kind === "conflict") return refuse(clientId, "conflict", "conflict",
-      `${configPath} cannot be managed while ${candidates.path} also defines provider.opencodex`);
+      `${configPath} cannot be managed while ${candidates.paths.join(", ")} also defines provider.opencodex`);
     if (candidates.kind === "unsafe") return refuse(clientId, "unsafe", "unsafe",
       `${candidates.path} cannot be inspected safely (${candidates.why})`);
   }

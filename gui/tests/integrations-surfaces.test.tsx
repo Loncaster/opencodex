@@ -237,7 +237,7 @@ afterEach(async () => {
 
 async function mountClient(
   active = true,
-  client: "hermes" | "dsh" = "hermes",
+  client: "hermes" | "dsh" | "kilo" = "hermes",
 ): Promise<void> {
   const [{ createRoot }, { LanguageProvider }, { default: FileIntegrationPage }] = await Promise.all([
     import("react-dom/client"),
@@ -437,6 +437,15 @@ test("a conflict offers an overwrite, and no other state does", async () => {
   stateResponse = () => json(status({ state: "conflict", reason: "unowned-key" }));
   await remountClient();
   expect(buttonByText("Replace")).toBeDefined();
+});
+
+test("Kilo candidate conflict names the other file and offers no overwrite", async () => {
+  const path = "/tmp/home/.config/kilo/opencode.jsonc";
+  stateResponse = () => json(status({ clientId: "kilo", state: "conflict", reason: "candidate-conflict", conflictPaths: [path] }));
+  await mountClient(true, "kilo");
+  expect(buttonByText("Replace")).toBeUndefined();
+  expect(container.textContent).toContain(path);
+  expect(container.textContent).toContain("Remove provider.opencodex from that file");
 });
 
 test("a client with no config on disk is never offered an overwrite", async () => {
@@ -678,6 +687,15 @@ async function mountOverview(): Promise<void> {
   });
   await act(async () => { await new Promise<void>(resolve => testWindow.setTimeout(resolve, 30)); });
 }
+
+test("overview names a competing Kilo file without offering Replace", async () => {
+  const path = "/tmp/home/.config/kilo/config.json";
+  stateResponse = () => json({ clients: [status({ clientId: "kilo", state: "conflict", reason: "candidate-conflict", conflictPaths: [path] })] });
+  await mountOverview();
+  const card = container.querySelector('.integration-card[data-client="kilo"]')!;
+  expect(card.textContent).toContain(path);
+  expect(Array.from(card.querySelectorAll("button")).some(button => button.textContent?.trim() === "Replace")).toBe(false);
+});
 
 test("the overview reconciles a journal row another tab already deleted", async () => {
   stateResponse = () => json({ clients: [status()] });

@@ -528,8 +528,8 @@ Kilo CLI, VS Code, and JetBrains share one global config. This integration write
 (`XDG_CONFIG_HOME` relocates that directory). If none exist, the destination is
 `kilo.jsonc`. Project configs are never written.
 Kilo merges all of these global files. If another candidate also defines
-`provider.opencodex`, status reports a conflict and Apply refuses; remove the
-duplicate block before enabling the integration. An unreadable or unsafe
+`provider.opencodex`, status names every competing file and Apply and Replace refuse;
+remove `provider.opencodex` from those files before enabling the integration. An unreadable or unsafe
 candidate also blocks the write.
 
 The owned fragment is only `provider.opencodex` (OpenCode V1 shape: `npm`, `options`,

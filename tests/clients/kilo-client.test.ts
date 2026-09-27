@@ -20,7 +20,7 @@ import { INTEGRATION_CLIENTS } from "../../src/integrations/registry";
 import { createIntegrationStateStore, type IntegrationStateStore } from "../../src/integrations/store";
 import { readIntegrationState } from "../../src/integrations/state";
 import { previewIntegration } from "../../src/integrations/mutation-plan";
-import { applyIntegration, disableIntegration, restoreIntegration } from "../../src/integrations/writer";
+import { applyIntegration, disableIntegration, overwriteIntegration, restoreIntegration } from "../../src/integrations/writer";
 import type { OcxConfig } from "../../src/types";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
 
@@ -202,12 +202,14 @@ describe("kilo JSONC apply/disable/restore", () => {
     writeFileSync(first, firstText);
     writeFileSync(later, laterText);
     const input = writeInput();
-    expect(readIntegrationState(input)).toMatchObject({ state: "conflict", reason: "candidate-conflict", configPath: first });
+    expect(readIntegrationState(input)).toMatchObject({ state: "conflict", reason: "candidate-conflict", configPath: first, conflictPaths: [later] });
     const preview = previewIntegration(input, { operation: "apply" });
     expect(preview.canApply).toBe(false);
     expect(preview.refusalReason).toBe("conflict");
+    expect(previewIntegration(input, { operation: "overwrite" }).canApply).toBe(false);
     const result = applyIntegration(input);
     expect(result.ok).toBe(false);
+    expect(overwriteIntegration(input)).toMatchObject({ ok: false, reason: "conflict" });
     if (!result.ok) {
       expect(result.reason).toBe("conflict");
       expect(result.message).toContain(first);
@@ -216,6 +218,15 @@ describe("kilo JSONC apply/disable/restore", () => {
     expect(readFileSync(first, "utf8")).toBe(firstText);
     expect(readFileSync(later, "utf8")).toBe(laterText);
     expect(store.listOperations("kilo")).toHaveLength(0);
+  });
+
+  test("status names every competing Kilo candidate", () => {
+    const dir = INTEGRATION_CLIENTS.kilo.detectDir({}, home);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "kilo.jsonc"), "{}\n");
+    const paths = [join(dir, "kilo.json"), join(dir, "config.json")];
+    for (const path of paths) writeFileSync(path, '{"provider":{"opencodex":{}}}\n');
+    expect(readIntegrationState(writeInput()).conflictPaths).toEqual(paths);
   });
 
   test("a later provider block refuses even when the first candidate has none", () => {

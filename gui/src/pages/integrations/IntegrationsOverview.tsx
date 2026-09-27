@@ -189,6 +189,9 @@ function OverviewCard({
       {detail && (
         <p className={row.detail ? "integration-path" : "integration-meta"}>{detail}</p>
       )}
+      {row.status?.reason === "candidate-conflict" && row.status.conflictPaths?.map(path => (
+        <Notice key={path} tone="err">{t("integrations.status.candidateConflict", { path })}</Notice>
+      ))}
       {result?.tone === "err" && <Notice tone="err">{result.text}</Notice>}
       {result?.tone === "ok" && <Notice tone="ok">{result.text}</Notice>}
       <div className="integration-card-actions">
@@ -217,8 +220,8 @@ function OverviewCard({
         </button>
         {/*
           Only in conflict, and only for a file client. The switch beside it stays
-          disabled -- this is not a second way to toggle, it is the way past a state
-          the toggle deliberately refuses to guess about.
+          disabled -- this is not a second way to toggle, it is the way past a
+          conflict the server permits replacing.
         */}
         {onOverwrite && (
           <button type="button" className="btn btn-danger" onClick={onOverwrite} disabled={pending}>
@@ -778,7 +781,7 @@ export default function IntegrationsOverview({
               result={cardResults[row.id] ?? null}
               onOpen={() => navigateHash(row.hash)}
               onToggle={row.toggle ? () => requestToggle(row, !(row.toggleOn ?? row.applied)) : null}
-              onOverwrite={row.status !== null && row.status.state === "conflict" && row.installed
+              onOverwrite={row.status !== null && row.status.state === "conflict" && row.status.reason !== "candidate-conflict" && row.installed
                 ? () => void requestFilePlan(row, "overwrite")
                 : null}
             />

@@ -64,6 +64,7 @@ export interface IntegrationStatus {
   appliedAt?: string;
   lastOpId?: string;
   reason?: IntegrationReason;
+  conflictPaths?: string[];
   /**
    * The store this client reads instead of `configPath`, when one exists.
    *

@@ -314,10 +314,10 @@ export default function FileIntegrationPage({
         Conflict used to be a dead end: the switch locks, the page explains why,
         and the only way forward was to open the file and edit it by hand -- which
         is the thing a user came to a dashboard to avoid. The switch stays locked
-        and this is the one way past it, behind a dialog that names the file and
-        says what is lost.
+        and this is the way past an overwriteable conflict, behind a dialog
+        that names the file and says what is lost.
       */}
-      {status.installed && status.state === "conflict" && (
+      {status.installed && status.state === "conflict" && status.reason !== "candidate-conflict" && (
         <button
           type="button"
           className="btn btn-danger"
@@ -330,6 +330,9 @@ export default function FileIntegrationPage({
 
       <p className="page-sub">{t(SEMANTICS_KEY[client])}</p>
       <p className="integration-path">{status.configPath}</p>
+      {status.reason === "candidate-conflict" && status.conflictPaths?.map(path => (
+        <Notice key={path} tone="err">{t("integrations.status.candidateConflict", { path })}</Notice>
+      ))}
       {/* Only the raycast envelope carries this; the guard is the field, not the id. */}
       {status.raycast && <RaycastPlanNotice install={status.raycast} />}
       {/*

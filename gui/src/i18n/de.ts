@@ -1538,6 +1538,7 @@ export const de: Record<TKey, string> = {
   "integrations.status.notInstalled": "Nicht installiert",
   "integrations.status.appliedAt": "Angewendet",
   "integrations.status.supersededStore": "Dieser Client liest seine Provider jetzt aus {path}, und opencodex schreibt diese Datei nicht. Ein Aktivieren hier ändert nichts an dem, was der Client lädt.",
+  "integrations.status.candidateConflict": "Eine weitere Kilo-Konfigurationsdatei, {path}, definiert ebenfalls provider.opencodex. Entfernen Sie provider.opencodex aus dieser Datei, bevor Sie fortfahren.",
   "integrations.status.backup": "Sicherung",
   "integrations.status.lastRestore": "Letzte Wiederherstellung",
   "integrations.status.unknown": "Unbekannt",

@@ -63,6 +63,8 @@ export interface IntegrationStatus {
   appliedAt?: string;
   lastOpId?: string;
   reason?: StateReason;
+  /** Other Kilo global candidates defining provider.opencodex. */
+  conflictPaths?: string[];
   /**
    * The store this client reads instead of `configPath`.
    *
@@ -573,6 +575,7 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
       installed,
       configPath,
       reason: candidates.kind === "conflict" ? "candidate-conflict" : candidates.why,
+      ...(candidates.kind === "conflict" ? { conflictPaths: candidates.paths } : {}),
       ...retention,
     };
   }

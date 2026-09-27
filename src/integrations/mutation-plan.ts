@@ -895,7 +895,7 @@ export function observeIntegration(input: IntegrationWriteInput, effects: Observ
   if (clientId === "kilo") {
     const candidates = inspectKiloCandidates({ io, selectedPath: configPath, env: input.env, home: input.home });
     if (candidates.kind !== "ok") return { failed: candidates.kind === "conflict"
-      ? observationFailure("conflict", "conflict", `${configPath} cannot be managed while ${candidates.path} also defines provider.opencodex`)
+      ? observationFailure("conflict", "conflict", `${configPath} cannot be managed while ${candidates.paths.join(", ")} also defines provider.opencodex`)
       : observationFailure("unsafe", "unsafe", `${candidates.path} cannot be inspected safely (${candidates.why})`),
     } as const;
   }

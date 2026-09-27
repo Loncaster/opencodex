@@ -9,9 +9,9 @@ export function inspectKiloCandidates(input: {
   env?: NodeJS.ProcessEnv;
   home?: string;
 }): { kind: "ok" } | { kind: "unsafe"; path: string; why: "unparseable" | "not-regular-file" }
-  | { kind: "conflict"; path: string } {
+  | { kind: "conflict"; paths: string[] } {
   const dir = kiloHomeDir(input.env ?? process.env, input.home ?? homedir());
-  let conflictPath: string | null = null;
+  const conflictPaths: string[] = [];
   for (const name of KILO_CONFIG_CANDIDATES) {
     const path = kiloCandidatePath(dir, name);
     const loaded = loadTarget(input.io, path);
@@ -23,8 +23,8 @@ export function inspectKiloCandidates(input: {
       && !Array.isArray(parsed) && Object.hasOwn(parsed, "provider")) {
       const provider = (parsed as Record<string, unknown>).provider;
       if (typeof provider === "object" && provider !== null && !Array.isArray(provider)
-        && Object.hasOwn(provider, "opencodex")) conflictPath = path;
+        && Object.hasOwn(provider, "opencodex")) conflictPaths.push(path);
     }
   }
-  return conflictPath ? { kind: "conflict", path: conflictPath } : { kind: "ok" };
+  return conflictPaths.length > 0 ? { kind: "conflict", paths: conflictPaths } : { kind: "ok" };
 }
