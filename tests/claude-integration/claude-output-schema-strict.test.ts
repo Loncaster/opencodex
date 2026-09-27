@@ -139,6 +139,54 @@ describe("translated Anthropic structured output strict eligibility (#5901 follo
     }), true);
   });
 
+  test("fine-tuned targets preserve unsupported constraints with strict disabled", () => {
+    const schema = closedObject({
+      nested: {
+        anyOf: [
+          { type: "string", pattern: "^[a-z]+$" },
+          { type: "array", items: { type: "integer", minimum: 0 }, maxItems: 3 },
+        ],
+      },
+      mapped: { $ref: "#/$defs/mapped" },
+    });
+    schema.$defs = {
+      mapped: {
+        type: "object", properties: {}, required: [], additionalProperties: false,
+        patternProperties: { "^x-": { type: "string" } },
+      },
+    };
+    const before = structuredClone(schema);
+
+    for (const model of ["ft:gpt-4.1-nano:org::name", "openai/ft:gpt-4.1-nano:org::name"]) {
+      expect(formatFromOutputConfig({ format: { type: "json_schema", schema } }, model))
+        .toEqual({ type: "json_schema", name: "response", schema, strict: false });
+    }
+    expect(formatFromOutputConfig({ format: { type: "json_schema", schema } }, "gpt-4.1-nano"))
+      .toEqual({ type: "json_schema", name: "response", schema, strict: true });
+    expect(schema).toEqual(before);
+  });
+
+  test("resolved modelMap targets control fine-tuned strict eligibility", () => {
+    const constrained = closedObject({ value: { type: "string", format: "email" } });
+    const raw = {
+      model: "claude-sonnet-5", max_tokens: 256,
+      messages: [{ role: "user", content: "Return JSON" }],
+      output_config: { format: { type: "json_schema", schema: constrained } },
+    };
+    const fineTuned = anthropicToResponsesBody(raw, {
+      modelMap: { "claude-sonnet-5": "openai/ft:gpt-4.1-nano:org::name" },
+    });
+    expect((fineTuned.text as { format: { strict: boolean } }).format.strict).toBe(false);
+    expect(fineTuned.model).toBe("openai/ft:gpt-4.1-nano:org::name");
+
+    const ordinary = anthropicToResponsesBody({ ...raw, output_config: {
+      format: { type: "json_schema", schema: closedObject({ value: { type: "string" } }) },
+    } }, {
+      modelMap: { "claude-sonnet-5": "openai/ft:gpt-4.1-nano:org::name" },
+    });
+    expect((ordinary.text as { format: { strict: boolean } }).format.strict).toBe(true);
+  });
+
   test("property names and literal data are not mistaken for schema keywords", () => {
     const schema = closedObject({
       not: { type: "string" }, allOf: { type: "string" }, properties: { type: "string" },

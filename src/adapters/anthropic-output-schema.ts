@@ -155,6 +155,13 @@ const OPENAI_STRICT_NUMBER_KEYWORDS = new Set([
 ]);
 const OPENAI_STRICT_ARRAY_KEYWORDS = new Set(["items", "minItems", "maxItems"]);
 const OPENAI_STRICT_TYPES = new Set(["string", "number", "boolean", "integer", "object", "array", "null"]);
+// Fine-tuned models implement a narrower documented Structured Outputs subset. Falling back to
+// non-strict keeps the caller's schema intact; deleting these constraints would silently widen it.
+const OPENAI_FINE_TUNED_UNSUPPORTED_KEYWORDS = new Set([
+  "patternProperties", "pattern", "format",
+  ...OPENAI_STRICT_NUMBER_KEYWORDS,
+  "minItems", "maxItems",
+]);
 
 function openAiStrictSchemaTypes(value: unknown): Set<string> | null {
   if (value === undefined) return new Set();
@@ -192,7 +199,7 @@ function hasOnlyOpenAiStrictKeywords(node: Record<string, unknown>, types: Set<s
  * would silently change the contract the caller asked for, so the only honest answer is to stop
  * claiming strict for these schemas -- the schema is still sent and still honoured as guidance.
  */
-export function satisfiesOpenAiStrictSchema(value: unknown): boolean {
+export function satisfiesOpenAiStrictSchema(value: unknown, fineTuned = false): boolean {
   // Callers pass one schema node. Boolean/null/array schemas are outside the documented
   // Structured Outputs subset; schema lists such as anyOf are validated explicitly below.
   if (!isRecord(value)) return false;
@@ -201,6 +208,9 @@ export function satisfiesOpenAiStrictSchema(value: unknown): boolean {
   // maintaining an inevitably incomplete denylist. The original schema is still forwarded.
   const types = openAiStrictSchemaTypes(node.type);
   if (!types || !hasOnlyOpenAiStrictKeywords(node, types)) return false;
+  if (fineTuned && Object.keys(node).some(key => OPENAI_FINE_TUNED_UNSUPPORTED_KEYWORDS.has(key))) {
+    return false;
+  }
   if (Object.hasOwn(node, "$ref") && typeof node.$ref !== "string") return false;
   if (Object.hasOwn(node, "title") && typeof node.title !== "string") return false;
   if (Object.hasOwn(node, "description") && typeof node.description !== "string") return false;
@@ -243,12 +253,14 @@ export function satisfiesOpenAiStrictSchema(value: unknown): boolean {
   for (const key of ["properties", "$defs", "definitions", "patternProperties"]) {
     if (!Object.hasOwn(node, key)) continue;
     const entries = node[key];
-    if (!isRecord(entries) || !Object.values(entries).every(satisfiesOpenAiStrictSchema)) return false;
+    if (!isRecord(entries)
+      || !Object.values(entries).every(entry => satisfiesOpenAiStrictSchema(entry, fineTuned))) return false;
   }
-  if (Object.hasOwn(node, "items") && !satisfiesOpenAiStrictSchema(node.items)) return false;
+  if (Object.hasOwn(node, "items") && !satisfiesOpenAiStrictSchema(node.items, fineTuned)) return false;
   if (Object.hasOwn(node, "anyOf")) {
     const anyOf = node.anyOf;
-    if (!Array.isArray(anyOf) || anyOf.length === 0 || !anyOf.every(satisfiesOpenAiStrictSchema)) {
+    if (!Array.isArray(anyOf) || anyOf.length === 0
+      || !anyOf.every(entry => satisfiesOpenAiStrictSchema(entry, fineTuned))) {
       return false;
     }
   }
