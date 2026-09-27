@@ -387,6 +387,8 @@ the same `{env:OPENCODEX_KILO_API_KEY}` / `x-opencodex-api-key` rule as OpenCode
 All candidate files are inspected through the no-follow, bounded parser before status or
 mutation. If another candidate defines `provider.opencodex`, status reports a conflict and
 preview/apply refuse with both paths named; an unsafe or unparseable candidate also refuses.
+Apply scans the candidates again after its selected-file compare and before snapshot capture,
+so a competing file introduced during planning is refused before commit.
 
 Because that resolution depends on which candidates EXIST, a candidate created after
 apply can win discovery while the owned file still holds the block. The registry's

@@ -227,6 +227,31 @@ describe("kilo JSONC apply/disable/restore", () => {
     expect(applyIntegration(writeInput()).ok).toBe(false);
   });
 
+  test("a candidate created after observation refuses before snapshot", () => {
+    const dir = INTEGRATION_CLIENTS.kilo.detectDir({}, home);
+    mkdirSync(dir, { recursive: true });
+    const first = join(dir, "kilo.jsonc");
+    const later = join(dir, "opencode.jsonc");
+    const firstText = '{"model":"keep"}\n';
+    const laterText = '{"provider":{"opencodex":{"name":"late"}}}\n';
+    writeFileSync(first, firstText);
+    const baseIO = store.io();
+    let selectedReads = 0;
+    const result = applyIntegration({ ...writeInput(), io: {
+      ...baseIO,
+      readText(path) {
+        const read = baseIO.readText(path);
+        if (path === first && ++selectedReads === 2) writeFileSync(later, laterText);
+        return read;
+      },
+    } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("conflict");
+    expect(readFileSync(first, "utf8")).toBe(firstText);
+    expect(readFileSync(later, "utf8")).toBe(laterText);
+    expect(store.listOperations("kilo")).toHaveLength(0);
+  });
+
   test("an unsafe second candidate refuses before touching the selected file", () => {
     const dir = INTEGRATION_CLIENTS.kilo.detectDir({}, home);
     mkdirSync(dir, { recursive: true });

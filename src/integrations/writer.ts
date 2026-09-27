@@ -19,6 +19,7 @@ import { detachedConfigSnapshot } from "../config/admitted-identity";
 import { copyPlainData } from "../lib/plain-data";
 import type { OcxConfig } from "../types";
 import { defaultIntegrationIO, loadTarget, type IntegrationIO } from "./config-io";
+import { inspectKiloCandidates } from "./kilo-candidates";
 import {
   fingerprint,
   canonicalContribution,
@@ -434,6 +435,13 @@ function applyOrRefreshIntegration(
   const rechecked = recheck.kind === "text" ? recheck.text : recheck.kind === "missing" ? null : undefined;
   if (rechecked === undefined || rechecked !== before) {
     return refuse(clientId, "conflict", "conflict", `${configPath} changed while applying`);
+  }
+  if (clientId === "kilo") {
+    const candidates = inspectKiloCandidates({ io, selectedPath: configPath, env: input.env, home: input.home });
+    if (candidates.kind === "conflict") return refuse(clientId, "conflict", "conflict",
+      `${configPath} cannot be managed while ${candidates.path} also defines provider.opencodex`);
+    if (candidates.kind === "unsafe") return refuse(clientId, "unsafe", "unsafe",
+      `${candidates.path} cannot be inspected safely (${candidates.why})`);
   }
 
   const opId = newOpId();
