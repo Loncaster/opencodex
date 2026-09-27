@@ -304,6 +304,11 @@ describe("combo management API", () => {
         strategy: "failover",
         targets: [{ modelProfile: "Low marginal subscription cost; 1M context." }],
       });
+      const reloaded = readConfigDiagnostics();
+      expect(reloaded.source).toBe("file");
+      expect(reloaded.error).toBeNull();
+      expect(reloaded.config.combos?.["jev-profile"]?.targets[0]?.modelProfile)
+        .toBe("Low marginal subscription cost; 1M context.");
       for (const invalidNote of [" ".repeat(513), "   ", "Unsafe\u0000note", 123]) {
         const rejected = await comboApi(config, "PUT", "/api/combos", {
           id: "jev-profile",
