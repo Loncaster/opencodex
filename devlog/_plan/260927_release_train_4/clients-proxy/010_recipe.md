@@ -52,7 +52,7 @@ not passing evidence. A docs-only CI skip is recorded as skipped, not
 as a passing suite. PR template Summary/Verification/Checklist, source author
 credit, exact-head required checks, and post-merge `dev` CI still apply.
 
-Architect `01a0e33a-811b-7471-a32a-52455283082e` proposed D1-R (carry the
+The architect proposed D1-R (carry the
 isolation and route examples), D1-L (one AGENTS discovery link), and D1-V
 (attribution and exact gates). All three are accepted. Putting the recipe in
 `skills/ocx/` would confuse development tests with operating guidance; a

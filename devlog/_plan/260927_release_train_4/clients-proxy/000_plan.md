@@ -95,15 +95,12 @@ head before the next batch.
 
 ## Consultation and uncertainty
 
-Architect proposal `01a0e33a-811b-7471-a32a-52455283082e`: D1 existing
+The architect proposal: D1 existing
 integration ownership and D2 proxy ownership accepted; D3 Cursor discovery
 amended to hold pending opt-in; D4 managed clients accepted with #3833 held;
 D5 new client proposals held pending primary client contracts; D6 JEV then
-memory accepted; D7 Codex updater remains design-only. Source PR reviewers:
-`01a0e338-ca02-7620-9ecd-cb6970740789`,
-`01a0e339-163d-7240-9e96-4e7552dc9e47`,
-`01a0e339-17ce-7540-b189-1241d837662b`, and
-`01a0e339-18b6-7403-b450-5d3d86fee0be`. The architect's first reflection
+memory accepted; D7 Codex updater remains design-only. Four independent source
+PR reviewers examined the candidates. The architect's first reflection
 found three gaps: attribution trailer, explicit security review, and the
 recipe's OS-home isolation condition. All three were folded into this revision
 before independent audit. Their findings are proposals; each carry is
@@ -120,7 +117,7 @@ exited 1; it is not evidence of test passage. Docs checks and semantic audit
 cover the roadmap, and implementation batches rerun changed tests.
 
 The same architect rechecked the D2 safety amendment and returned ALIGNED.
-Independent A reviewer `01a0e345-7fc4-7bc0-bef9-dd4c8e927d59` first
+The independent A reviewer first
 reported six blockers, then one remaining test-layout blocker; every finding
 was folded into the relevant decade document and its final verdict was PASS.
 This closes the roadmap design review, not any proposed code change.
