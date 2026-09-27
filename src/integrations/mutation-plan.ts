@@ -27,6 +27,7 @@ import { PARSE_FAILED, defaultIntegrationIO, loadTarget, parseConfig, type Integ
 import {
   INTEGRATION_CLIENTS,
   assertDroidPathsUnambiguous,
+  assertDroidRecordedSettingsUnambiguous,
   isLoopbackOnly,
   resolveIntegrationPaths,
   type IntegrationClientId,
@@ -341,6 +342,7 @@ function foreignEditOf(input: PlanInput): IntegrationPlanForeignEdit {
 function applyOutcome(input: PlanInput): PlanOutcome {
   if (input.installKind !== "dir") return deny("not_installed");
   if (input.admissionBlocked) return deny("non_loopback");
+  if (input.clientId === "droid" && input.contribution?.fragments.length === 0) return deny("unsafe");
   /*
    * Before any file state. The document may be perfectly writable and our block
    * may already be current in it; neither says anything about whether the
@@ -904,6 +906,9 @@ export function observeIntegration(input: IntegrationWriteInput, effects: Observ
   const record = stored && stored.clientId === clientId && stored.configPath === configPath
     ? stored
     : null;
+  if (clientId === "droid" && input.models.length > 0 && contribution.fragments.length === 0 && !record) {
+    return { failed: observationFailure("unsafe", "unsafe", "Factory Droid has no addressable models in the selected catalog") } as const;
+  }
   // `configPath`/`clientId` are load-bearing, not decoration: a record proves
   // ownership of ONE file, and the writer mutates whatever path resolves NOW.
   // Without them a record written for another home directory would grant
@@ -912,6 +917,13 @@ export function observeIntegration(input: IntegrationWriteInput, effects: Observ
     fileText: before, fileIsRegular: true, parsed, record, contribution, configPath, clientId,
     format: effective.format,
   });
+  if (clientId === "droid" && record && (classified.state === "current" || classified.state === "stale")) {
+    try { assertDroidRecordedSettingsUnambiguous(detectDir, parsed, record); }
+    catch (error) {
+      if (!(error instanceof ClientPathError)) throw error;
+      return { failed: observationFailure("unsafe", "unsafe", error.message) } as const;
+    }
+  }
   return {
     failed: undefined, store, io, clientId, spec, exportSpec, target: effective, configPath, detectDir,
     /*

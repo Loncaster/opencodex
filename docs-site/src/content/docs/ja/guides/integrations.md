@@ -22,7 +22,7 @@ description: ダッシュボードから opencodex を OpenCode、Pi、OMP、Her
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 保存後すぐ。Raycast がファイルを監視 | なし。ループバックのみ |
 | omo | `~/.omo/agent/models.json` | JSON | 新しいセッション | ループバック用プレースホルダー |
 | Cline CLI | `~/.cline/data/settings/providers.json` と同階層の `models.json` | JSON のペア | Cline の停止と再起動後 | ループバック用プレースホルダー |
-| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` Windows の場合) | JSON | ファイル変更を即時反映 | キー不要のループバック |
 
 生成されるカタログには、各プロバイダーの選択で有効なモデルのみが含まれます。これはダウンロードと管理対象の統合の両方に適用され、Pi と Aside も対象です。管理画面のモデル一覧にはすべてのモデルが表示されるため、追加のモデルを有効にできます。
 
@@ -244,4 +244,4 @@ GitHub Copilot デスクトップアプリでは、opencodex を OpenAI 互換�
 
 ## Factory Droid
 
-Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).
+Factory Droid は `~/.factory/settings.json`（Windows では `%USERPROFILE%\.factory\settings.json`）を使用します。`ocx integration client enable --client droid` で明示的に有効化し、`/model` でカスタムモデルを選択します。管理対象の行はキーを使わず、ループバックでのみ動作します。無効化すると管理対象の行が削除され、Undo で保存済みのバイト列が復元されます。従来の `config.json` に OpenCodex の行がある場合や、`settings.local.json` が `customModels` を上書きする場合は、有効化する前に競合を解消してください。[Factory BYOK のドキュメント](https://docs.factory.ai/model-independence/byok)も参照してください。

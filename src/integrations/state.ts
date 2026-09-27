@@ -34,6 +34,7 @@ import {
 import {
   INTEGRATION_CLIENTS,
   assertDroidPathsUnambiguous,
+  assertDroidRecordedSettingsUnambiguous,
   resolveIntegrationPaths,
   unresolvedPathHintFor,
   type IntegrationClientId,
@@ -329,7 +330,13 @@ export function classifyIntegration(input: {
     }
     throw error;
   }
-  if (!hasOurFragments(input.parsed, input.contribution)) return { state: "absent" };
+  // A catalog can shrink to zero while the record still owns earlier rows.
+  // Presence for disable must include those recorded paths, independent of the
+  // current export roster; the ownership fingerprint is checked below.
+  if (!hasOurFragments(input.parsed, input.contribution)
+    && !(input.record?.fragmentPaths.some(path => readPath(input.parsed, path) !== undefined))) {
+    return { state: "absent" };
+  }
 
   /*
    * Fragments the desired contribution carries beyond the paths this record names. Both
@@ -577,6 +584,11 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
     ? parseClineDocument(loaded.before)
     : parseConfig(loaded.before, effective.format);
   const contribution = effective.buildContribution(exportContextOf(input));
+  if (input.clientId === "droid" && input.models.length > 0 && contribution.fragments.length === 0
+    && (!record || record.configPath !== configPath)) {
+    return { clientId: input.clientId, state: "unsafe", installed, configPath,
+      reason: "unresolvable-path", ...retention };
+  }
   const { state, reason } = classifyIntegration({
     fileText: loaded.before,
     fileIsRegular: true,
@@ -587,6 +599,14 @@ export function readIntegrationState(input: IntegrationStateInput): IntegrationS
     clientId: input.clientId,
     format: effective.format,
   });
+  if (input.clientId === "droid" && record && (state === "current" || state === "stale")) {
+    try { assertDroidRecordedSettingsUnambiguous(spec.detectDir(input.env, input.home), parsed, record); }
+    catch (error) {
+      if (!(error instanceof ClientPathError)) throw error;
+      return { clientId: input.clientId, state: "unsafe", installed, configPath,
+        reason: "unresolvable-path", ...retention };
+    }
+  }
 
   return {
     clientId: input.clientId,

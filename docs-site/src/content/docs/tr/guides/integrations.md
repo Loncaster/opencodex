@@ -24,7 +24,7 @@ yapılandırma dosyasına yazar ve tekrar kaldırır. On beş istemci bu şekild
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | kaydedildiği anda — Raycast dosyayı izler | yok — yalnızca geri döngü |
 | omo | `~/.omo/agent/models.json` | JSON | yeni oturumlarda | geri döngü yer tutucusu |
 | Cline CLI | `~/.cline/data/settings/providers.json` + `models.json` | JSON | kapatıp yeniden başlattıktan sonra | yalnızca loopback |
-| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` Windows'ta) | JSON | dosya değişince hemen | anahtarsız geri döngü |
 
 Desteklenen akıl yürütme düzeylerine sahip GJC modelleri, GJC'nin düzey seçimi sunabilmesi için `reasoning: true`, `thinking.levels` ve `compat.supportsReasoningEffort` alanlarını dışa aktarır. Yerel Codex modelleri, katalogda belirtilmese bile standart düzeylerini alır. Bilinen düzeyi olmayan modellerde bu alanlar bulunmaz. `none` düzey göndermez ve `ultra` gönderimde `max` düzeyine dönüşür; bu yüzden seçeneklerde yer almazlar. Model seçeneklerini güncellemek için entegrasyonu yenileyin.
 
@@ -328,4 +328,4 @@ ocx integration client restore --op <operation-id>
 
 ## Factory Droid
 
-Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).
+Factory Droid, `~/.factory/settings.json` dosyasını (Windows'ta `%USERPROFILE%\.factory\settings.json`) kullanır. `ocx integration client enable --client droid` komutuyla açıkça etkinleştirin, ardından `/model` içinde özel bir model seçin. Yönetilen satırlar anahtarsızdır ve yalnızca geri döngü bağlantısında çalışır. Devre dışı bırakma yönetilen satırları kaldırır; Undo kaydedilen baytları geri yükler. Eski `config.json` dosyasında OpenCodex satırları varsa veya `settings.local.json`, `customModels` değerini geçersiz kılıyorsa etkinleştirmeden önce çakışmayı giderin. [Factory BYOK belgelerine](https://docs.factory.ai/model-independence/byok) bakın.

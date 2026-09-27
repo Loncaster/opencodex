@@ -177,6 +177,46 @@ describe("Factory Droid documented personal settings", () => {
     expect(existsSync(join(store.root, "snapshots", "droid"))).toBe(false);
   });
 
+  for (const [name, models] of [
+    ["empty", []],
+    ["unaddressable", [{ namespaced: "mock/a,b", provider: "mock", id: "a,b" }]],
+  ] as const) {
+    test(`disable removes recorded rows after the catalog becomes ${name}`, () => {
+      const foreign = { model: "personal", displayName: "Personal", baseUrl: "http://localhost:11434/v1" };
+      const path = install(JSON.stringify({ customModels: [foreign] }) + "\n");
+      expect(applyIntegration(request()).ok).toBe(true);
+      const changed = request([...models]);
+      expect(readIntegrationState(changed).state).toBe("stale");
+      expect(previewIntegration(changed, { operation: "disable" })).toMatchObject({ canApply: true, willChange: true });
+      expect(previewIntegration(changed, { operation: "apply" }).canApply).toBe(false);
+      expect(disableIntegration(changed)).toMatchObject({ ok: true, changed: true, state: "absent" });
+      expect(read(path).customModels).toEqual([foreign]);
+    });
+  }
+
+  test("catalog loss does not authorize removal of a foreign edit", () => {
+    const path = install('{"customModels":[]}\n');
+    expect(applyIntegration(request()).ok).toBe(true);
+    const edited = read(path);
+    edited.customModels[0]!.baseUrl = "http://localhost:11434/v1";
+    writeFileSync(path, JSON.stringify(edited));
+    expect(disableIntegration(request([]))).toMatchObject({ ok: false, reason: "conflict" });
+    expect(read(path).customModels[0]!.baseUrl).toBe("http://localhost:11434/v1");
+  });
+
+  test("catalog loss still refuses a legacy row with a recorded model ID", () => {
+    const path = install('{"customModels":[]}\n');
+    expect(applyIntegration(request()).ok).toBe(true);
+    const before = readFileSync(path, "utf8");
+    writeFileSync(join(droidHomeDir({}, home), "config.json"), JSON.stringify({ custom_models: [
+      { model: MODELS[0]!.namespaced, display_name: "Personal", base_url: "http://localhost:11434/v1" },
+    ] }));
+    expect(readIntegrationState(request([]))).toMatchObject({ state: "unsafe", reason: "unresolvable-path" });
+    expect(previewIntegration(request([]), { operation: "disable" }).canApply).toBe(false);
+    expect(disableIntegration(request([])).ok).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(before);
+  });
+
   test("refuses ambiguous rows, symlink targets, and edited managed rows", () => {
     const row = { model: MODELS[0]!.namespaced, displayName: "OpenCodex: Claude Fable 5.1", baseUrl: BASE, provider: "generic-chat-completion-api" };
     const ambiguous = JSON.stringify({ customModels: [row, row] });

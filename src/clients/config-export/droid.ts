@@ -45,14 +45,15 @@ function buildDroidRows(ctx: ExportContext): Array<{ row: DroidModelEntry; selec
       noImageSupport: !model.inputModalities?.includes("image"),
     } });
   }
-  if (ctx.models.length > 0 && rows.length === 0) {
-    throw new Error("Factory Droid has no addressable models in the selected catalog");
-  }
   return rows;
 }
 
 export function buildDroidClientConfig(ctx: ExportContext): DroidGeneratedConfig {
-  return { customModels: buildDroidRows(ctx).map(({ row }) => row) };
+  const rows = buildDroidRows(ctx);
+  if (ctx.models.length > 0 && rows.length === 0) {
+    throw new Error("Factory Droid has no addressable models in the selected catalog");
+  }
+  return { customModels: rows.map(({ row }) => row) };
 }
 
 export function summarizeDroid(document: unknown) {

@@ -45,6 +45,13 @@ row is addressed by its `model` and `OpenCodex:` prefixed `displayName`; `baseUr
 remains in the protected row value. Duplicate matches refuse. Rows whose model ID
 or display name cannot be represented by that selector are omitted from both the
 export document and managed fragments. A nonempty catalog that yields no rows refuses.
+Direct and management exports use the live listener policy and refuse when Droid
+would need an admission header. When a previously managed catalog becomes empty
+or wholly unaddressable, classification still checks recorded fragment paths and
+their fingerprints so disable can remove owned rows without deleting foreign edits.
+The legacy settings guard also checks the recorded model IDs and endpoints when
+those rows leave the current catalog.
+Apply and refresh still refuse an empty managed contribution.
 The builder omits `apiKey` and unsupported metadata. The shared writer snapshots
 prior bytes and refuses changed managed rows or unsafe paths. `src/integrations/droid-settings.ts` refuses
 legacy `config.json` rows that share the exported endpoint, a generated model ID, or an

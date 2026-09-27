@@ -22,7 +22,7 @@ description: 从仪表盘将 opencodex 连接到 OpenCode、Pi、OMP、Hermes、
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 保存后立即生效——Raycast 监视该文件 | 无——仅回环 |
 | omo | `~/.omo/agent/models.json` | JSON | 新会话 | 回环占位符 |
 | Cline CLI | `~/.cline/data/settings/providers.json` 及同目录下的 `models.json` | JSON 文件对 | 停止并重启 Cline 后 | 回环占位符 |
-| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` Windows 上) | JSON | 文件变更时立即生效 | 无密钥回环 |
 
 生成的目录只包含各提供商选择中已启用的模型。下载文件和托管集成都遵循这一规则，Pi 和 Aside 也不例外。管理模型列表仍显示完整阵容，以便启用更多模型。
 
@@ -242,4 +242,4 @@ GitHub Copilot 桌面应用可以将 opencodex 用作兼容 OpenAI 的模型提�
 
 ## Factory Droid
 
-Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).
+Factory Droid 使用 `~/.factory/settings.json`（Windows 上为 `%USERPROFILE%\.factory\settings.json`）。使用 `ocx integration client enable --client droid` 明确启用，然后在 `/model` 中选择自定义模型。托管条目不含密钥，且仅支持回环连接。禁用会移除托管条目；Undo 会恢复保存的原始字节。如果旧版 `config.json` 含有 OpenCodex 条目，或 `settings.local.json` 覆盖了 `customModels`，请先解决冲突再启用。参见 [Factory BYOK 文档](https://docs.factory.ai/model-independence/byok)。

@@ -22,7 +22,7 @@ description: 대시보드에서 OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, 
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 저장 즉시 — Raycast가 파일을 감시함 | 없음 — 루프백 전용 |
 | omo | `~/.omo/agent/models.json` | JSON | 새 세션에서 | 루프백 자리표시자 |
 | Cline CLI | `~/.cline/data/settings/providers.json` 및 같은 위치의 `models.json` | JSON 파일 쌍 | Cline을 중지하고 다시 시작한 뒤 | 루프백 자리표시자 |
-| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` Windows에서) | JSON | 파일 변경 시 즉시 | 키 없는 루프백 |
 
 생성된 카탈로그에는 각 프로바이더 선택에서 활성화된 모델만 들어갑니다. Pi와 Aside를 포함한 다운로드와 관리형 연동 모두에 적용됩니다. 관리 모델 목록에는 전체 모델이 계속 표시되어 추가 모델을 활성화할 수 있습니다.
 
@@ -242,4 +242,4 @@ GitHub Copilot 데스크톱 앱에서 opencodex를 OpenAI 호환 모델 프로�
 
 ## Factory Droid
 
-Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).
+Factory Droid는 `~/.factory/settings.json`(Windows에서는 `%USERPROFILE%\.factory\settings.json`)을 사용합니다. `ocx integration client enable --client droid`로 명시적으로 활성화한 다음 `/model`에서 사용자 지정 모델을 선택하세요. 관리되는 항목에는 키가 없으며 루프백에서만 동작합니다. 비활성화하면 관리되는 항목이 제거되고, Undo는 저장된 원본 바이트를 복원합니다. 기존 `config.json`에 OpenCodex 항목이 있거나 `settings.local.json`이 `customModels`를 덮어쓰면 활성화 전에 충돌을 해결하세요. [Factory BYOK 문서](https://docs.factory.ai/model-independence/byok)를 참고하세요.

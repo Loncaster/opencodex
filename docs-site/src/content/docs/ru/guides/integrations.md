@@ -24,7 +24,7 @@ description: Подключайте opencodex к OpenCode, Pi, OMP, Hermes, Open
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | сразу после сохранения — Raycast следит за файлом | нет — только loopback |
 | omo | `~/.omo/agent/models.json` | JSON | в новых сессиях | заглушка для loopback |
 | Cline CLI | `~/.cline/data/settings/providers.json` и соседний `models.json` | пара JSON | после остановки и повторного запуска Cline | заглушка для loopback |
-| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows) | JSON | file watch | keyless loopback |
+| Factory Droid | `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` в Windows) | JSON | сразу при изменении файла | loopback без ключа |
 
 Создаваемые каталоги включают только модели, включённые в настройках каждого
 провайдера. Это относится и к скачиваемым файлам, и к управляемым интеграциям,
@@ -558,4 +558,4 @@ OpenCodex требует явного `--overwrite-conflict`. Отключени
 
 ## Factory Droid
 
-Factory Droid uses `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` on Windows). Explicitly enable with `ocx integration client enable --client droid`, then select a custom model in `/model`. The managed rows are keyless and loopback only. Disable removes managed rows; Undo restores the saved bytes. If legacy `config.json` contains OpenCodex rows or `settings.local.json` overrides `customModels`, resolve that conflict before enabling. See the [Factory BYOK documentation](https://docs.factory.ai/model-independence/byok).
+Factory Droid использует `~/.factory/settings.json` (`%USERPROFILE%\.factory\settings.json` в Windows). Явно включите интеграцию командой `ocx integration client enable --client droid`, затем выберите пользовательскую модель через `/model`. Управляемые записи не содержат ключа и работают только через loopback. Отключение удаляет управляемые записи, а Undo восстанавливает сохранённые байты. Если в прежнем `config.json` есть записи OpenCodex или `settings.local.json` переопределяет `customModels`, устраните конфликт до включения. См. [документацию Factory BYOK](https://docs.factory.ai/model-independence/byok).

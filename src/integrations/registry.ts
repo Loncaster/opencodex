@@ -10,10 +10,12 @@
  */
 import { homedir } from "node:os";
 import { assertDroidSettingsUnambiguous } from "./droid-settings";
+import { readPath } from "./merge";
+import type { OwnershipRecord } from "./ownership";
 import { join } from "node:path";
 import {
   ClientPathError,
-  buildDroidClientConfig,
+  buildDroidContribution,
   clineConfigPath,
   clineSettingsDir,
   droidConfigPath,
@@ -53,6 +55,7 @@ import {
   type BuildContribution,
   type ConfigFormat,
   type ExportClientId,
+  type DroidModelEntry,
   type ExportContext,
 } from "../clients/config-export";
 
@@ -142,10 +145,27 @@ export function resolveIntegrationPaths(
 
 export function assertDroidPathsUnambiguous(root: string, exportContext?: ExportContext): void {
   try {
-    const generated = exportContext ? buildDroidClientConfig(exportContext).customModels : [];
-    assertDroidSettingsUnambiguous(root, exportContext?.baseUrl, generated.map(row => row.model));
+    const generated = exportContext ? buildDroidContribution(exportContext).fragments : [];
+    assertDroidSettingsUnambiguous(root, exportContext?.baseUrl, generated.map(fragment => (fragment.value as DroidModelEntry).model));
   }
   catch (error) { throw new ClientPathError((error as Error).message); }
+}
+
+/** Check the identities still owned on disk even after they leave the catalog. */
+export function assertDroidRecordedSettingsUnambiguous(root: string, parsed: unknown, record: OwnershipRecord): void {
+  try {
+    const byEndpoint = new Map<string, Set<string>>();
+    for (const path of record.fragmentPaths) {
+      const row = readPath(parsed, path) as Partial<DroidModelEntry> | undefined;
+      if (typeof row?.baseUrl !== "string" || typeof row.model !== "string") {
+        throw new Error("Cannot verify recorded Factory Droid rows");
+      }
+      const models = byEndpoint.get(row.baseUrl) ?? new Set<string>();
+      models.add(row.model);
+      byEndpoint.set(row.baseUrl, models);
+    }
+    for (const [baseUrl, models] of byEndpoint) assertDroidSettingsUnambiguous(root, baseUrl, [...models]);
+  } catch (error) { throw new ClientPathError((error as Error).message); }
 }
 
 /**
