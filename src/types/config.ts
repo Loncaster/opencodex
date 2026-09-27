@@ -883,10 +883,10 @@ export interface OcxConfig {
    * HTTP URLs are mirrored into HTTP_PROXY/HTTPS_PROXY when unset. SOCKS5 URLs are mirrored
    * into ALL_PROXY, clear inherited HTTP(S)_PROXY, and use OpenCodex's SOCKS5 transport.
    * Loopback stays in NO_PROXY.
-   * The literal `"auto"` reads the Windows WinINET static proxy (`ProxyEnable`/`ProxyServer`)
-   * once at process start, preserving separate HTTP and HTTPS entries; on other platforms, or
-   * when the system proxy is off, SOCKS-only, or unreadable, it degrades to direct egress with
-   * one log line (#1525). PAC/WPAD and live changes are not followed.
+   * The literal `"auto"` reads Windows WinINET or macOS static HTTP/HTTPS proxy settings
+   * once at startup. Inherited scheme proxies win; on macOS, inherited ALL_PROXY also skips
+   * discovery, and unsafe system exceptions refuse discovery without environment writes.
+   * PAC/WPAD, SOCKS-only settings, and live changes are not followed.
    */
   proxy?: string;
   /**

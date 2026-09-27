@@ -3,7 +3,9 @@
 `src/config/proxy-env.ts` remains the single application owner for global proxy
 configuration. An explicit SOCKS5 or SOCKS5h URL selects ALL_PROXY and removes
 stale scheme-proxy variables; HTTP(S) settings retain their existing environment
-precedence. Activation keeps the existing Windows auto-discovery path and loopback
+precedence. Activation keeps the existing Windows auto-discovery path and adds opt-in
+macOS discovery for `proxy: "auto"`. It never consults macOS settings when any scheme
+proxy or `ALL_PROXY`/`all_proxy` is inherited. The shared path keeps loopback
 NO_PROXY entries; the no-configured-proxy return merges all of them only when an inherited
 SOCKS proxy is the only inherited proxy; whenever Bun applies an inherited HTTP(S) scheme proxy
 or HTTP(S) `ALL_PROXY`/`all_proxy`, it matches by domain suffix, so activation adds only the
@@ -29,3 +31,16 @@ userinfo is stripped while host and port stay visible, `direct` and credential-l
 print unchanged, and a non-URL value that is not `direct` is masked whole. `config export`
 keeps the raw file so exports can restore credentials. Get and mutation output select
 redaction by the normalized final path segment, matching lookup and mutation semantics.
+
+On macOS, `src/config/macos-system-proxy.ts` reads the top-level static HTTP/HTTPS
+settings from `/usr/sbin/scutil --proxy` once, with a timeout and output bound.
+Only enabled schemes are installed. PAC/WPAD, simple-host bypasses, malformed
+settings, and exception patterns whose semantics cannot be represented safely
+refuse discovery before any proxy-environment write. Only IP literals and the
+all-host `*` exception are translated. Accepted exceptions enter both `NO_PROXY`
+and an inherited non-empty `no_proxy`, since Bun gives lowercase precedence;
+only loopback addresses are appended, never the bare `localhost` suffix.
+Inherited SOCKS routes keep their existing uppercase bypass semantics and do
+not receive macOS exceptions. The diagnostic reports a category, never raw
+settings or credential-bearing URLs. Regression cases live in
+`tests/server/proxy-env-macos.test.ts`.

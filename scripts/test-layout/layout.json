@@ -1447,6 +1447,7 @@
     "provider-workspace-data.test.ts": "gui",
     "provider-workspace-rail.test.ts": "gui",
     "provider-workspace-state.test.ts": "gui",
+    "proxy-env-macos.test.ts": "server",
     "proxy-env.test.ts": "server",
     "proxy-liveness-package-tree-fence.test.ts": "server",
     "proxy-liveness.test.ts": "server",
