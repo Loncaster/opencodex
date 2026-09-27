@@ -595,7 +595,16 @@ export async function prepareResponsesRequest(
     // Name the phase in the persisted route decision, so the request log says why this turn went to
     // the memory destination instead of leaving it looking like a plain user selection. Set here, on
     // the resolved route, so a combo child's own route carries it too.
-    if (parsed._memoryModelPhase) route.routeReason = memoryModelRouteReason(parsed._memoryModelPhase);
+    if (parsed._memoryModelPhase) {
+      const reason = memoryModelRouteReason(parsed._memoryModelPhase);
+      route.routeReason = reason;
+      if (route.routeDecision) {
+        route.routeDecision = {
+          ...route.routeDecision,
+          selected: { ...route.routeDecision.selected, reason },
+        };
+      }
+    }
     if (options.compactionRoutingOverride && !compactionRoutingKeepsProviderIdentity(config, options.compactionRoutingOverride, route)) {
       credentialDomainWasRewritten = true;
       // The destination does not share the conversation's credential domain, so it can neither

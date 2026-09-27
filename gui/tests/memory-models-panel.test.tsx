@@ -101,9 +101,15 @@ test("saves each phase independently and clears effort with its model", async ()
   expect(writes.at(-1)).toEqual({
     memoryModels: { extract: { model: "gateway/cheap", reasoningEffort: "low" }, consolidation: { model: "gateway/cheap", reasoningEffort: "medium" } },
   });
+  await choose("consolidation", OFF);
+  await choose("consolidation", "gateway/cheap");
+  await save();
+  expect(writes.at(-1)).toEqual({
+    memoryModels: { extract: { model: "gateway/cheap", reasoningEffort: "low" }, consolidation: { model: "gateway/cheap" } },
+  });
   await choose("extract", OFF);
   await save();
-  expect(writes.at(-1)).toEqual({ memoryModels: { consolidation: { model: "gateway/cheap", reasoningEffort: "medium" } } });
+  expect(writes.at(-1)).toEqual({ memoryModels: { consolidation: { model: "gateway/cheap" } } });
   await choose("consolidation", OFF);
   await save();
   expect(writes.at(-1)).toEqual({ memoryModels: null });

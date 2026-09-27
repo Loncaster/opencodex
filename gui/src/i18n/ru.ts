@@ -444,7 +444,7 @@ export const ru: Record<TKey, string> = {
   "memoryModels.off": "Выключено",
   "memoryModels.defaultEffort": "Как в Codex",
   "memoryModels.dataNotice": "Выбранная модель получает входные данные своей фазы: завершённую сессию для Extract и сырые записи для Consolidation.",
-  "memoryModels.accountNotice": "Здесь смаршрутизирована только одна фаза; другая сохраняет свой текущий маршрут. Shadow Call Intercept тоже может отправлять вызовы памяти этой фазы в свою настроенную модель.",
+  "memoryModels.accountNotice": "Здесь смаршрутизирована только одна фаза; другая сохраняет свой текущий маршрут. Shadow Call Intercept тоже может отправлять вызовы памяти другой фазы в свою настроенную модель.",
   "memoryModels.loadFailed": "Не удалось загрузить настройки памяти.",
   "memoryModels.saved": "Настройки памяти сохранены.",
   "memoryModels.saveFailed": "Не удалось сохранить. Ваши изменения на месте; попробуйте снова.",

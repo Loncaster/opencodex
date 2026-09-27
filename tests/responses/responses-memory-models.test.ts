@@ -6,6 +6,7 @@ import {
   detectMemoryModelPhase,
 } from "../../src/server/responses/memory-models";
 import { handleResponses } from "../../src/server/responses";
+import type { RequestLogContext } from "../../src/server/request-log";
 import { MODEL_NOT_ALLOWED_FOR_KEY } from "../../src/server/admission-model-scope";
 import { getDefaultConfig, validateConfigCandidate } from "../../src/config";
 import { configSchema } from "../../src/config/schema/config-schema";
@@ -313,7 +314,7 @@ describe("memory model routing", () => {
       return Response.json(completion());
     }) as typeof fetch;
 
-    const extractCtx = { model: "", provider: "" } as { model: string; provider: string; requestedModel?: string };
+    const extractCtx = { model: "", provider: "" } as RequestLogContext;
     const extract = await handleResponses(request(body(), extractMetadata()), settings, extractCtx);
     expect(extract.status).toBe(200);
     await extract.text();
@@ -322,14 +323,16 @@ describe("memory model routing", () => {
     // The caller's own selector stays in the log; only the served model changed.
     expect(extractCtx.requestedModel).toBe("gpt-5.6-luna");
     expect(extractCtx.model).toBe("cheap");
+    expect(extractCtx.routeDecision?.selected.reason).toBe("memory-extract");
 
-    const consolidationCtx = { model: "", provider: "" } as { model: string; provider: string; requestedModel?: string };
+    const consolidationCtx = { model: "", provider: "" } as RequestLogContext;
     const consolidation = await handleResponses(request(body("gpt-5.6-terra"), consolidationMetadata()), settings, consolidationCtx);
     expect(consolidation.status).toBe(200);
     await consolidation.text();
     expect(calls[1]!.model).toBe("strong");
     expect(calls[1]!.reasoning.effort).toBe("xhigh");
     expect(consolidationCtx.requestedModel).toBe("gpt-5.6-terra");
+    expect(consolidationCtx.routeDecision?.selected.reason).toBe("memory-consolidation");
   });
 
   test("an unconfigured phase and a turn without the marker keep their own model", async () => {
@@ -426,7 +429,7 @@ describe("memory model routing", () => {
       calls.push(JSON.parse(String(init?.body)));
       return Response.json(completion());
     }) as typeof fetch;
-    const logCtx = { model: "", provider: "" } as { model: string; provider: string; requestedModel?: string };
+    const logCtx = { model: "", provider: "" } as RequestLogContext;
     const response = await handleResponses(request(body(), extractMetadata()), settings, logCtx);
     expect(response.status).toBe(200);
     await response.text();
@@ -435,5 +438,6 @@ describe("memory model routing", () => {
     // A combo target has to reach the dispatcher as `model`, so the rewritten selector is what the
     // log records as requested; the phase itself is named in the route decision.
     expect(logCtx.requestedModel).toBe("combo/memory");
+    expect(logCtx.routeDecision?.selected.reason).toBe("memory-extract");
   });
 });

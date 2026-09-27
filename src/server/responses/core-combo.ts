@@ -45,6 +45,7 @@ import {
 } from "../../responses/state";
 import { hasUnreadableEncryptedAgentTask } from "./encrypted-payload";
 import { routeConcreteModel, comboRouteDecisionTrace } from "../../router";
+import { memoryModelRouteReason } from "./memory-models";
 import { isCanonicalOpenAiForwardProvider } from "../../providers/openai-tiers";
 import type { AgentTaskRecoveryFailureReason } from "./agent-task-recovery";
 import {
@@ -558,7 +559,10 @@ export async function executeComboResponses(
   }
   // One immutable combo selection trace, before any child dispatch; child
   // adoption below must never replace it with a concrete child route trace.
-  logCtx.routeDecision = comboRouteDecisionTrace(config, comboId, pick, requestedModel);
+  const decision = comboRouteDecisionTrace(config, comboId, pick, requestedModel);
+  logCtx.routeDecision = options.memoryModelPhase
+    ? { ...decision, selected: { ...decision.selected, reason: memoryModelRouteReason(options.memoryModelPhase) } }
+    : decision;
 
   const originalReasoning = body && typeof body === "object" && !Array.isArray(body)
     ? (body as { reasoning?: unknown }).reasoning

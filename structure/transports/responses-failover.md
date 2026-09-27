@@ -288,6 +288,8 @@ is absent. WebSocket frames never use that handshake fallback. A configured phas
 `memoryModels` wins over shadow-call interception; an unset phase keeps its existing route.
 Unavailable targets return 409 without contacting a different provider, while scoped API-key
 admission keeps its own refusal. Combo children retain the phase and its optional effort.
+The selected route decision records `memory-extract` or `memory-consolidation` as its reason,
+including when the destination is a combo, so request history names the phase that chose it.
 
 ## Compaction routing overrides
 
