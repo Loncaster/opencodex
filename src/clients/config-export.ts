@@ -51,7 +51,7 @@ export type { DshReasoningEffort, DshWireReasoningEffort, DshModelEntry, DshProv
 export type { McodeProviderBlock, McodeModelEntry, McodeGeneratedConfig } from "./config-export/mcode";
 export type { RaycastAbility, RaycastAbilityName, RaycastModelEntry, RaycastProviderEntry, RaycastGeneratedConfig } from "./config-export/raycast";
 export { buildRaycastClientConfig, summarizeRaycast, buildRaycastContribution } from "./config-export/raycast";
-export { droidHomeDir, droidConfigPath, assertDroidSettingsUnambiguous, buildDroidClientConfig, summarizeDroid, buildDroidContribution } from "./config-export/droid";
+export { droidHomeDir, droidConfigPath, buildDroidClientConfig, summarizeDroid, buildDroidContribution } from "./config-export/droid";
 export type { DroidModelEntry, DroidGeneratedConfig } from "./config-export/droid";
 
 import type { OpencodeLaunchEnv, OpencodeCatalogModel, ExportContext, PiModelEntry, ManagedContribution, ManagedFragment, ExportClientId, ExportClientSpec } from "./config-export/contracts";

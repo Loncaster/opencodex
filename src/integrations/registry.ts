@@ -9,6 +9,7 @@
  * Design of record: devlog/_fin/260802_client_toggle_api/021 §1.
  */
 import { homedir } from "node:os";
+import { assertDroidSettingsUnambiguous } from "./droid-settings";
 import { join } from "node:path";
 import {
   ClientPathError,
@@ -16,7 +17,6 @@ import {
   clineSettingsDir,
   droidConfigPath,
   droidHomeDir,
-  assertDroidSettingsUnambiguous,
   EXPORT_CLIENTS,
   asideAccountDir,
   asideConfigPath,

@@ -43,7 +43,7 @@ Factory Droid's explicit integration writes only documented `customModels` rows 
 `~/.factory/settings.json` (`%USERPROFILE%\\.factory\\settings.json` on Windows). Each
 row is addressed by its `model` and loopback `baseUrl`; duplicate matches refuse.
 The builder omits `apiKey` and unsupported metadata. The shared writer snapshots
-prior bytes and refuses changed managed rows or unsafe paths. Resolution refuses
+prior bytes and refuses changed managed rows or unsafe paths. `src/integrations/droid-settings.ts` refuses
 legacy OpenCodex rows in `config.json` and any `customModels` override in
 `settings.local.json`, because Factory merges those files with personal settings.
 No Droid file is written by detection or on the proxy request path.
