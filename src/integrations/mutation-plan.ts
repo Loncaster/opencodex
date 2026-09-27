@@ -26,6 +26,7 @@ import { parseClineDocument } from "./cline-document";
 import { PARSE_FAILED, defaultIntegrationIO, loadTarget, parseConfig, type IntegrationIO } from "./config-io";
 import {
   INTEGRATION_CLIENTS,
+  assertDroidPathsUnambiguous,
   isLoopbackOnly,
   resolveIntegrationPaths,
   type IntegrationClientId,
@@ -552,7 +553,9 @@ export function observeRestore(
   const clientId = input.clientId;
   let resolved: { configPath: string; detectDir: string };
   try {
-    resolved = input.resolvedPaths ?? resolveIntegrationPaths(clientId, input.env, input.home);
+    const context = exportContextOf(input);
+    resolved = input.resolvedPaths ?? resolveIntegrationPaths(clientId, input.env, input.home, context);
+    if (clientId === "droid" && input.resolvedPaths) assertDroidPathsUnambiguous(resolved.detectDir, context);
   } catch (error) {
     if (!(error instanceof ClientPathError)) throw error;
     return { failed: observationFailure("unsafe", "unsafe", error.message) } as const;
@@ -840,7 +843,9 @@ export function observeIntegration(input: IntegrationWriteInput, effects: Observ
      * an Aside account switch land between the two, so a direct apply could
      * verify account 1 was installed and then write account 0's catalog.
      */
-    const resolved = input.resolvedPaths ?? resolveIntegrationPaths(clientId, input.env, input.home);
+    const context = exportContextOf(input);
+    const resolved = input.resolvedPaths ?? resolveIntegrationPaths(clientId, input.env, input.home, context);
+    if (clientId === "droid" && input.resolvedPaths) assertDroidPathsUnambiguous(resolved.detectDir, context);
     detectDir = resolved.detectDir;
     if (clientId === "cline") io = createClineIO(io, resolved.configPath, store, effects.recover);
     /*

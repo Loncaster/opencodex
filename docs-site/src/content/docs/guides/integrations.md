@@ -530,8 +530,9 @@ removes the managed rows; Undo restores the exact saved file. Other settings and
 custom models remain yours.
 
 Droid also reads legacy `config.json` and local `settings.local.json`. Resolve
-any existing OpenCodex rows in legacy config, or a local `customModels` override,
-before enabling; OpenCodex refuses those ambiguous settings. It also refuses an
+legacy rows that use the OpenCodex endpoint, a generated model ID, or an
+`OpenCodex:` display name, and any local `customModels` override, before enabling;
+OpenCodex refuses those ambiguous settings. It also refuses an
 unsafe target or a row edited since apply. The integration is loopback only and
 never copies provider credentials. Factory documents the [BYOK schema](https://docs.factory.ai/model-independence/byok)
 and [personal settings path](https://docs.factory.ai/droid-cli/settings).

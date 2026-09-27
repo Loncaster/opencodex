@@ -44,7 +44,8 @@ Factory Droid's explicit integration writes only documented `customModels` rows 
 row is addressed by its `model` and loopback `baseUrl`; duplicate matches refuse.
 The builder omits `apiKey` and unsupported metadata. The shared writer snapshots
 prior bytes and refuses changed managed rows or unsafe paths. `src/integrations/droid-settings.ts` refuses
-legacy OpenCodex rows in `config.json` and any `customModels` override in
+legacy `config.json` rows that share the exported endpoint, a generated model ID, or an
+`OpenCodex:` display name, and any `customModels` override in
 `settings.local.json`, because Factory merges those files with personal settings.
 No Droid file is written by detection or on the proxy request path.
 

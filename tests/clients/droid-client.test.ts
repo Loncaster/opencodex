@@ -7,6 +7,8 @@ import {
   type DroidGeneratedConfig, type ExportModel,
 } from "../../src/clients/config-export";
 import { INTEGRATION_CLIENTS, resolveIntegrationPaths } from "../../src/integrations/registry";
+import { readIntegrationState } from "../../src/integrations/state";
+import { previewIntegration } from "../../src/integrations/mutation-plan";
 import { createIntegrationStateStore, type IntegrationStateStore } from "../../src/integrations/store";
 import { applyIntegration, disableIntegration, restoreIntegration } from "../../src/integrations/writer";
 import { refreshOwnedCatalogIntegrations } from "../../src/integrations/catalog-refresh";
@@ -146,5 +148,43 @@ describe("Factory Droid documented personal settings", () => {
     writeFileSync(join(dir, "config.json"), '{"custom_models":[]}');
     writeFileSync(join(dir, "settings.local.json"), '{"customModels":[]}');
     expect(() => resolveIntegrationPaths("droid", {}, home)).toThrow("settings.local.json");
+  });
+
+  for (const [caseName, row] of [
+    ["legacy OpenCodex display name", { model: "other", display_name: "OpenCodex: Existing", base_url: "http://example.test/v1" }],
+    ["same generated model id", { model: MODELS[0]!.namespaced, display_name: "Personal", base_url: "http://example.test/v1" }],
+    ["localhost endpoint with trailing slash", { model: "other", display_name: "Personal", base_url: "http://localhost:10100/v1/" }],
+    ["IPv6 loopback endpoint", { model: "other", display_name: "Personal", base_url: "http://[::1]:10100/v1" }],
+  ] as const) {
+    test(`refuses ${caseName} before snapshot or write`, () => {
+      const seed = '{"customModels":[]}\n';
+      const path = install(seed);
+      writeFileSync(join(droidHomeDir({}, home), "config.json"), JSON.stringify({ custom_models: [row] }));
+      const input = caseName === "same generated model id"
+        ? { ...request(), resolvedPaths: { configPath: path, detectDir: droidHomeDir({}, home) } }
+        : request();
+      expect(readIntegrationState(input)).toMatchObject({ state: "unsafe", reason: "unresolvable-path" });
+      expect(previewIntegration(input, { operation: "apply" })).toMatchObject({ canApply: false, refusalReason: "unsafe" });
+      const result = applyIntegration(input);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).toContain("config.json");
+        expect(result.message).not.toContain("http");
+      }
+      expect(readFileSync(path, "utf8")).toBe(seed);
+      expect(store.listOperations("droid")).toHaveLength(0);
+      expect(existsSync(join(store.root, "snapshots", "droid"))).toBe(false);
+    });
+  }
+
+  test("allows a non-colliding legacy model", () => {
+    const path = install('{"customModels":[]}\n');
+    writeFileSync(join(droidHomeDir({}, home), "config.json"), JSON.stringify({ custom_models: [
+      { model: "personal", display_name: "Personal", base_url: "http://localhost:11434/v1/" },
+    ] }));
+    expect(readIntegrationState(request()).state).toBe("absent");
+    expect(previewIntegration(request(), { operation: "apply" }).canApply).toBe(true);
+    expect(applyIntegration(request()).ok).toBe(true);
+    expect(read(path).customModels).toHaveLength(MODELS.length);
   });
 });

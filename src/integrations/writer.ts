@@ -770,7 +770,7 @@ function freezeIntegrationInput(input: IntegrationWriteInput): FrozenIntegration
    */
   const resolvedPaths = input.resolvedPaths
     ? { ...input.resolvedPaths }
-    : resolveIntegrationPaths(input.clientId, env, home);
+    : resolveIntegrationPaths(input.clientId, env, home, exportContextOf(input));
   /*
    * The configuration and the roster are seams like the others, and they were the two still held
    * by reference. A coordinated write plans from this input, awaits the writer lock and a

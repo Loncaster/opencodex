@@ -4,8 +4,20 @@ import { join, win32 } from "node:path";
 
 const isWindowsRoot = (path: string) => /^[A-Za-z]:[\\/]|^\\\\/.test(path);
 
+function endpointKey(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    const host = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname.toLowerCase())
+      ? "127.0.0.1" : url.hostname.toLowerCase();
+    return `${url.protocol}//${host}:${url.port}${url.pathname.replace(/\/+$/, "") || "/"}`;
+  } catch { return null; }
+}
+
 /** Other Factory settings can take priority over the managed personal rows. */
-export function assertDroidSettingsUnambiguous(root: string): void {
+export function assertDroidSettingsUnambiguous(root: string, baseUrl?: string, modelIds: readonly string[] = []): void {
+  const managedEndpoint = baseUrl === undefined ? null : endpointKey(baseUrl);
+  const managedModels = new Set(modelIds);
   try {
     const directory = lstatSync(root);
     if (!directory.isDirectory()) throw new Error("Unsafe Factory settings directory");
@@ -39,9 +51,14 @@ export function assertDroidSettingsUnambiguous(root: string): void {
     if (name === "settings.local.json" && rows !== undefined) {
       throw new Error("Factory settings.local.json overrides customModels; resolve its precedence before enabling Droid");
     }
-    if (name === "config.json" && Array.isArray(rows) && rows.some(row =>
-      row && typeof row === "object" && typeof row.display_name === "string"
-      && row.display_name.startsWith("OpenCodex:"))) {
+    if (name === "config.json" && Array.isArray(rows) && rows.some(row => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+      const legacy = row as Record<string, unknown>;
+      return (typeof legacy.display_name === "string" && legacy.display_name.startsWith("OpenCodex:"))
+        || (typeof legacy.model === "string" && managedModels.has(legacy.model))
+        || (managedEndpoint !== null && typeof legacy.base_url === "string"
+          && endpointKey(legacy.base_url) === managedEndpoint);
+    })) {
       throw new Error("Factory config.json already defines OpenCodex models; resolve its precedence before enabling Droid");
     }
   }

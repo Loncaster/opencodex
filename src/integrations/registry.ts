@@ -13,6 +13,7 @@ import { assertDroidSettingsUnambiguous } from "./droid-settings";
 import { join } from "node:path";
 import {
   ClientPathError,
+  buildDroidClientConfig,
   clineConfigPath,
   clineSettingsDir,
   droidConfigPath,
@@ -52,6 +53,7 @@ import {
   type BuildContribution,
   type ConfigFormat,
   type ExportClientId,
+  type ExportContext,
 } from "../clients/config-export";
 
 /**
@@ -102,7 +104,7 @@ export interface IntegrationClientSpec {
    * another's catalog. Reading the id once and deriving both paths from it
    * removes the window instead of narrowing it.
    */
-  resolvePaths?: (env?: NodeJS.ProcessEnv, home?: string) => { configPath: string; detectDir: string };
+  resolvePaths?: (env?: NodeJS.ProcessEnv, home?: string, exportContext?: ExportContext) => { configPath: string; detectDir: string };
   /**
    * Where the client's config WOULD live, for a client whose real path cannot
    * be resolved yet.
@@ -132,10 +134,17 @@ export function resolveIntegrationPaths(
   clientId: IntegrationClientId,
   env: NodeJS.ProcessEnv = process.env,
   home: string = homedir(),
+  exportContext?: ExportContext,
 ): { configPath: string; detectDir: string } {
   const spec = INTEGRATION_CLIENTS[clientId];
-  if (spec.resolvePaths) return spec.resolvePaths(env, home);
+  if (spec.resolvePaths) return spec.resolvePaths(env, home, exportContext);
   return { configPath: spec.configPath(env, home), detectDir: spec.detectDir(env, home) };
+}
+
+export function assertDroidPathsUnambiguous(root: string, exportContext?: ExportContext): void {
+  const generated = exportContext ? buildDroidClientConfig(exportContext).customModels : [];
+  try { assertDroidSettingsUnambiguous(root, exportContext?.baseUrl, generated.map(row => row.model)); }
+  catch (error) { throw new ClientPathError((error as Error).message); }
 }
 
 /**
@@ -352,10 +361,9 @@ export const INTEGRATION_CLIENTS: Record<IntegrationClientId, IntegrationClientS
     id: "droid",
     configPath: (env = process.env, home = homedir()) => droidConfigPath(env, home),
     detectDir: (env = process.env, home = homedir()) => droidHomeDir(env, home),
-    resolvePaths: (env = process.env, home = homedir()) => {
+    resolvePaths: (env = process.env, home = homedir(), exportContext) => {
       const detectDir = droidHomeDir(env, home);
-      try { assertDroidSettingsUnambiguous(detectDir); }
-      catch (error) { throw new ClientPathError((error as Error).message); }
+      assertDroidPathsUnambiguous(detectDir, exportContext);
       return { configPath: droidConfigPath(env, home), detectDir };
     },
   },
