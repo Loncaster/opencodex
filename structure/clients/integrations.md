@@ -380,7 +380,8 @@ The shared atomic replacement publisher also identifies explicit Remote Workspac
 
 Kilo owns only `provider.opencodex` in the first existing global file among `kilo.jsonc`,
 `kilo.json`, `opencode.jsonc`, `opencode.json`, and `config.json` under `~/.config/kilo`
-(`XDG_CONFIG_HOME` relocates that directory). Parse accepts JSONC comments and trailing
+(`XDG_CONFIG_HOME` relocates that directory); when none exists, the destination is
+`kilo.jsonc`. Parse accepts JSONC comments and trailing
 commas; serialize rewrites the whole file as pretty JSON, so comments in other keys are
 not preserved. Kilo is not on the implicit owned-catalog fan-out. Remote admission uses
 the same `{env:OPENCODEX_KILO_API_KEY}` / `x-opencodex-api-key` rule as OpenCode.

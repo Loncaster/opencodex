@@ -15,7 +15,8 @@ import {
   type ExportContext,
 } from "../../src/clients/config-export";
 import type { KiloGeneratedConfig } from "../../src/clients/config-export/kilo";
-import { PARSE_FAILED, parseConfig } from "../../src/integrations/config-io";
+import { PARSE_FAILED, fileIO, parseConfig } from "../../src/integrations/config-io";
+import { inspectKiloCandidates } from "../../src/integrations/kilo-candidates";
 import { INTEGRATION_CLIENTS } from "../../src/integrations/registry";
 import { createIntegrationStateStore, type IntegrationStateStore } from "../../src/integrations/store";
 import { readIntegrationState } from "../../src/integrations/state";
@@ -147,9 +148,24 @@ describe("kilo client config", () => {
 
   test("Windows-shaped home and XDG paths retain native separators", () => {
     expect(kiloHomeDir({}, "C:\\Users\\Ada")).toBe("C:\\Users\\Ada\\.config\\kilo");
+    expect(kiloHomeDir({ XDG_CONFIG_HOME: "" }, "C:\\Users\\Ada"))
+      .toBe("C:\\Users\\Ada\\.config\\kilo");
+    expect(INTEGRATION_CLIENTS.kilo.detectDir({ XDG_CONFIG_HOME: "" }, "C:\\Users\\Ada"))
+      .toBe("C:\\Users\\Ada\\.config\\kilo");
     expect(kiloConfigPath({}, "C:\\Users\\Ada")).toBe("C:\\Users\\Ada\\.config\\kilo\\kilo.jsonc");
     expect(kiloConfigPath({ XDG_CONFIG_HOME: "D:\\settings" }, "C:\\Users\\Ada"))
       .toBe("D:\\settings\\kilo\\kilo.jsonc");
+  });
+
+  test("candidate read failures report unparseable, while non-files report their shape", () => {
+    const home = "C:\\Users\\Ada";
+    const selectedPath = kiloConfigPath({}, home);
+    const base = fileIO();
+    const inspect = (statKind: ReturnType<typeof base.statKind>) => inspectKiloCandidates({
+      io: { ...base, statKind: () => statKind }, selectedPath, home, env: {},
+    });
+    expect(inspect("failed")).toEqual({ kind: "unsafe", path: selectedPath, why: "unparseable" });
+    expect(inspect("directory")).toEqual({ kind: "unsafe", path: selectedPath, why: "not-regular-file" });
   });
 });
 

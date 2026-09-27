@@ -15,7 +15,7 @@ export function inspectKiloCandidates(input: {
   for (const name of KILO_CONFIG_CANDIDATES) {
     const path = kiloCandidatePath(dir, name);
     const loaded = loadTarget(input.io, path);
-    if (!loaded.ok) return { kind: "unsafe", path, why: "not-regular-file" };
+    if (!loaded.ok) return { kind: "unsafe", path, why: loaded.why === "read-failed" ? "unparseable" : "not-regular-file" };
     if (loaded.before === null) continue;
     const parsed = parseConfig(loaded.before, "json", { jsonc: true });
     if (parsed === PARSE_FAILED) return { kind: "unsafe", path, why: "unparseable" };

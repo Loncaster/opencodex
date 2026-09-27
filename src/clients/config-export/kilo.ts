@@ -54,9 +54,9 @@ function windowsPath(path: string): boolean {
 }
 
 export function kiloHomeDir(env: OpencodeLaunchEnv = process.env, home: string = homedir()): string {
-  const windows = windowsPath(env.XDG_CONFIG_HOME ?? home);
-  const pathJoin = windows ? win32.join : join;
-  const xdg = env.XDG_CONFIG_HOME && env.XDG_CONFIG_HOME.length > 0 ? env.XDG_CONFIG_HOME : pathJoin(home, ".config");
+  const override = env.XDG_CONFIG_HOME || undefined;
+  const pathJoin = windowsPath(override ?? home) ? win32.join : join;
+  const xdg = override ?? pathJoin(home, ".config");
   return pathJoin(xdg, "kilo");
 }
 

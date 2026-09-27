@@ -247,7 +247,7 @@ için kendi varsayılanlarını uygular) gelir.
 | `aside` | Aside'ın kendi `accounts.json` dosyasının güncel olarak gösterdiği hesap için `~/.aside/u/<account>/models.json`; okunamayan bir manifest, gelişigüzel bir hesaba düşmek yerine reddedilir | `aside-models.json` | yok — geri döngü yer tutucusu |
 | `raycast` | `~/.config/raycast/ai/providers.yaml`, macOS ve Windows'ta aynı (Raycast `XDG_CONFIG_HOME` değerini dikkate almaz) | `raycast-providers.yaml` | yok — yalnızca geri döngü, `api_keys` girdisi yazılmaz |
 | `omo` | `~/.omo/agent/models.json` (ayarlandığında sırasıyla `OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR`, `PI_CODING_AGENT_DIR` öncelikli; göreli değer reddedilir) | `omo-models.json` | yok — geri döngü yer tutucusu |
-| `kilo` | `~/.config/kilo` altında ilk bulunan `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` veya `config.json` | `kilo.jsonc` | `OPENCODEX_KILO_API_KEY` |
+| `kilo` | `~/.config/kilo` altında ilk bulunan `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` veya `config.json` (`XDG_CONFIG_HOME` bu dizini taşır); hiçbiri yoksa `kilo.jsonc` kullanılır | `kilo.jsonc` | `OPENCODEX_KILO_API_KEY` |
 
 Raycast dışa aktarımı, `providers` dizisinde tek bir `id: opencodex` öğesi içeren bağımsız
 bir `providers.yaml` belgesidir: `name: OpenCodex`, proxy'nin `/v1` temel URL'si ve

@@ -201,7 +201,7 @@ ocx export --client opencode --out ~/opencodex-opencode.json
 | `aside` | `~/.aside/u/<account>/models.json`. Aside의 `accounts.json`이 현재 계정으로 지정한 account를 사용합니다. 매니페스트를 읽을 수 없으면 임의의 계정으로 넘어가지 않고 거부합니다 | `aside-models.json` | 없음 — loopback placeholder |
 | `raycast` | `~/.config/raycast/ai/providers.yaml` (macOS와 Windows 모두 동일. Raycast는 `XDG_CONFIG_HOME`을 따르지 않습니다) | `raycast-providers.yaml` | 없음 — loopback 전용. `api_keys` 항목은 쓰지 않습니다 |
 | `omo` | `~/.omo/agent/models.json` (`OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR`, `PI_CODING_AGENT_DIR` 순서로 설정된 값이 우선. 상대 경로는 거부됩니다) | `omo-models.json` | 없음 — loopback placeholder |
-| `kilo` | `~/.config/kilo`에서 먼저 존재하는 `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` 또는 `config.json` | `kilo.jsonc` | `OPENCODEX_KILO_API_KEY` |
+| `kilo` | `~/.config/kilo`에서 먼저 존재하는 `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` 또는 `config.json` (`XDG_CONFIG_HOME`이 설정되면 해당 디렉터리 사용); 후보가 없으면 `kilo.jsonc` | `kilo.jsonc` | `OPENCODEX_KILO_API_KEY` |
 
 Raycast 내보내기는 `providers` 시퀀스에 `id: opencodex` 요소 하나만 담은 독립 `providers.yaml` 문서입니다. 내용은 `name: OpenCodex`, proxy의 `/v1` base URL, 그리고 `abilities`가 붙은 라우팅된 모든 모델입니다(`tools`와 `system_message`는 항상 지원, `vision`은 카탈로그의 입력 모달리티를 따름, `reasoning_effort`는 모델에 effort 사다리가 있을 때, `temperature`는 추론 모델에서 꺼짐). Custom Providers는 Raycast Pro 기능이며, Raycast가 이 파일을 감시하므로 저장한 변경은 재시작 없이 적용됩니다. 형식은 [manual.raycast.com/ai/custom-providers](https://manual.raycast.com/ai/custom-providers)에 문서화되어 있습니다. `api_keys` 항목은 쓰지 않으므로 이 내보내기는 loopback 전용이며, loopback이 아닌 bind는 거부됩니다.
 

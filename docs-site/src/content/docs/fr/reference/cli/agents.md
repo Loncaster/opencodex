@@ -220,7 +220,7 @@ propres valeurs par défaut à ces lignes.
 | `aside` | `~/.aside/u/<account>/models.json` pour le compte que le fichier `accounts.json` d'Aside désigne comme courant ; un manifeste illisible est refusé plutôt que de retomber sur un compte | `aside-models.json` | aucun — espace réservé de bouclage |
 | `raycast` | `~/.config/raycast/ai/providers.yaml`, sur macOS comme sur Windows (Raycast n'honore pas `XDG_CONFIG_HOME`) | `raycast-providers.yaml` | aucun — bouclage uniquement, aucune entrée `api_keys` n'est écrite |
 | `omo` | `~/.omo/agent/models.json` (`OMO_CODING_AGENT_DIR`, puis `SENPI_CODING_AGENT_DIR`, puis `PI_CODING_AGENT_DIR` l'emportent dans cet ordre une fois définis ; une valeur relative est refusée) | `omo-models.json` | aucun — espace réservé de bouclage |
-| `kilo` | premier fichier existant parmi `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` ou `config.json` sous `~/.config/kilo` | `kilo.jsonc` | `OPENCODEX_KILO_API_KEY` |
+| `kilo` | premier fichier existant parmi `kilo.jsonc`, `kilo.json`, `opencode.jsonc`, `opencode.json` ou `config.json` sous `~/.config/kilo` (`XDG_CONFIG_HOME` déplace ce répertoire) ; utilise `kilo.jsonc` si aucun n'existe | `kilo.jsonc` | `OPENCODEX_KILO_API_KEY` |
 
 L'exportation Raycast est un document `providers.yaml` autonome contenant un seul élément `id: opencodex`
 dans la séquence `providers` : `name: OpenCodex`, l'URL de base `/v1` du proxy et chaque modèle routé avec
