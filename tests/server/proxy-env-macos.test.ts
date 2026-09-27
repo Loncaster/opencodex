@@ -6,7 +6,7 @@ import type { OcxConfig } from "../../src/types";
 
 const KEYS = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"] as const;
 let saved: Record<string, string | undefined>;
-const config = (proxy?: string, noProxy?: string): OcxConfig => ({ proxy, noProxy, providers: {} }) as OcxConfig;
+const config = (proxy?: string, noProxy?: string | string[]): OcxConfig => ({ proxy, noProxy, providers: {} }) as OcxConfig;
 const scutil = (body: string): string => `<dictionary> {\n${body}\n}`;
 const both = "HTTPEnable : 1\nHTTPProxy : proxy.example\nHTTPPort : 8080\nHTTPSEnable : 1\nHTTPSProxy : ::1\nHTTPSPort : 8443";
 const snapshot = (): Record<string, string | undefined> => Object.fromEntries(KEYS.map(key => [key, process.env[key]]));
@@ -48,6 +48,25 @@ describe('macOS proxy: "auto" (#5853)', () => {
     expect(noProxyMatches(new URL("http://203.0.113.70"), { no_proxy: process.env.no_proxy })).toBe(false);
     expect(resolveProxyRoute(new URL("https://example.org"))).toEqual({ kind: "proxy", proxy: "http://[::1]:8443" });
   });
+
+  test.each(["localhost", "LOCALHOST", "LoCaLhOsT."])(
+    "configured %s stays uppercase without widening Bun's lowercase bypass", localhost => {
+      process.env.no_proxy = "lower.example";
+      applyProxyEnvWith(config("auto", [localhost, "private.example"]), {
+        platform: "darwin", macOSReader: () => scutil(both),
+      });
+      expect(process.env.NO_PROXY?.split(",")).toContain(localhost);
+      expect(process.env.NO_PROXY?.split(",")).toContain("private.example");
+      expect(process.env.no_proxy?.split(",")).toContain("private.example");
+      expect(process.env.no_proxy?.split(",").some(entry => /^localhost\.?$/i.test(entry))).toBe(false);
+      const app = new URL("http://app.localhost/");
+      expect(noProxyMatches(app, { no_proxy: process.env.no_proxy })).toBe(false);
+      expect(resolveProxyRoute(new URL("ws://app.localhost/")))
+        .toEqual({ kind: "proxy", proxy: "http://proxy.example:8080" });
+      expect(noProxyMatches(new URL("http://private.example/"), { no_proxy: process.env.no_proxy })).toBe(true);
+      expect(resolveProxyRoute(new URL("ws://private.example/"))).toEqual({ kind: "direct" });
+    },
+  );
 
   test("the all-host wildcard has the same bypass scope on both transports", () => {
     process.env.no_proxy = "lower.example";

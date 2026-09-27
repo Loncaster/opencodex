@@ -244,12 +244,14 @@ export function applyProxyEnvWith(
       // Bun gives non-empty lowercase no_proxy priority over NO_PROXY. Before
       // discovery there was no proxy, so suffix matching of a configured name
       // can only keep that name and its subdomains on their prior direct route.
-      // Add configured entries and system exceptions to both effective paths;
-      // keep name-based loopback out of the suffix matcher.
+      // Add configured entries and system exceptions to both effective paths,
+      // except bare localhost: Bun would match app.localhost as a suffix while
+      // the WebSocket matcher treats that name as exact.
       const configured = configuredNoProxyEntries(config);
       mergeNoProxyEntries([...configured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
       if (process.env.no_proxy?.trim()) {
-        process.env.no_proxy = withNoProxyEntries(process.env.no_proxy, [...configured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
+        const bunConfigured = configured.filter(host => !/^localhost\.?$/i.test(host));
+        process.env.no_proxy = withNoProxyEntries(process.env.no_proxy, [...bunConfigured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
       }
       configureSocks5Fetch();
       return;

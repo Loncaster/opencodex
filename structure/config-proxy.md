@@ -46,10 +46,14 @@ and malformed settings refuse discovery before any proxy-environment write.
 Accepted exceptions and configured `noProxy` entries enter both `NO_PROXY`
 and an inherited non-empty `no_proxy`, since Bun gives lowercase precedence.
 Before macOS discovery there is no inherited proxy, so Bun's suffix matching
-of a configured name can only keep that name and its subdomains on their
-pre-discovery direct route; it cannot move a host onto the proxy. This applies
-only to macOS discovery, not inherited or explicit proxy activation. For
-loopback, only addresses are appended, never the bare `localhost` suffix.
+of an ordinary configured name can only keep that name and its subdomains on
+their pre-discovery direct route; it cannot move a host onto the proxy. Bare
+`localhost` (case-insensitive, with or without a trailing dot) stays in
+uppercase `NO_PROXY` but is excluded from additions to lowercase `no_proxy`:
+Bun would bypass `app.localhost` as a suffix while the WebSocket matcher
+treats `localhost` as exact. This applies only to macOS discovery, not
+inherited or explicit proxy activation. For loopback, only addresses are
+appended, never the bare `localhost` suffix.
 Inherited SOCKS routes keep their existing uppercase bypass semantics and do
 not receive macOS exceptions. The diagnostic reports a category, never raw
 settings or credential-bearing URLs. Regression cases live in
