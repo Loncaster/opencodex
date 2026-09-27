@@ -30,19 +30,23 @@ export function droidConfigPath(env: OpencodeLaunchEnv = process.env, home: stri
 function buildDroidRows(ctx: ExportContext): Array<{ row: DroidModelEntry; selector: string }> {
   const rows: Array<{ row: DroidModelEntry; selector: string }> = [];
   for (const model of normalizeExportModels(ctx.models)) {
+    const displayName = `OpenCodex: ${exportPresentationLabel(model)}`;
     const selector = formatSelectorConjunction([
       { field: "model", value: model.namespaced },
-      { field: "baseUrl", value: ctx.baseUrl },
+      { field: "displayName", value: displayName },
     ]);
     // A row we cannot address safely cannot be managed or exported.
     if (!selector) continue;
     rows.push({ selector, row: {
       model: model.namespaced,
-      displayName: `OpenCodex: ${exportPresentationLabel(model)}`,
+      displayName,
       baseUrl: ctx.baseUrl,
       provider: "generic-chat-completion-api",
       noImageSupport: !model.inputModalities?.includes("image"),
     } });
+  }
+  if (ctx.models.length > 0 && rows.length === 0) {
+    throw new Error("Factory Droid has no addressable models in the selected catalog");
   }
   return rows;
 }

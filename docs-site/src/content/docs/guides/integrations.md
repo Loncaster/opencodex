@@ -528,8 +528,10 @@ Run Droid once to create `~/.factory`, then explicitly enable this integration w
 Chat Completions endpoint. Choose a row from Droid's `/model` picker. Disable
 removes the managed rows; Undo restores the exact saved file. Other settings and
 custom models remain yours.
-Models whose IDs contain `,` or `]` are skipped because the managed selector
-cannot address them safely; export and managed settings show the same rows.
+
+Models whose IDs or display names contain `,` or `]` are skipped because the
+managed selector cannot address them safely; export and managed settings show
+the same rows. A nonempty catalog with no addressable models is refused.
 
 Droid also reads legacy `config.json` and local `settings.local.json`. Resolve
 legacy rows that use the OpenCodex endpoint, a generated model ID, or an

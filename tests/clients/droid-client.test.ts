@@ -58,8 +58,8 @@ describe("Factory Droid documented personal settings", () => {
     expect(JSON.parse(built.text)).toEqual(built.document);
     expect(built.text).not.toContain("apiKey");
     expect(buildClientContribution("droid", { baseUrl: BASE, models: MODELS }).fragments.map(f => f.path)).toEqual([
-      ["customModels", `[v2:model=anthropic/claude-fable-5-1,baseUrl=${BASE}]`],
-      ["customModels", `[v2:model=mock/text,baseUrl=${BASE}]`],
+      ["customModels", "[v2:model=anthropic/claude-fable-5-1,displayName=OpenCodex: Claude Fable 5.1]"],
+      ["customModels", "[v2:model=mock/text,displayName=OpenCodex: Text]"],
     ]);
   });
 
@@ -67,6 +67,7 @@ describe("Factory Droid documented personal settings", () => {
     const models: ExportModel[] = [
       { namespaced: "mock/a,b", provider: "mock", id: "a,b", inputModalities: ["text"] },
       { namespaced: "mock/c]d", provider: "mock", id: "c]d", inputModalities: ["text"] },
+      { namespaced: "mock/comma-label", provider: "mock", id: "comma-label", displayName: "Comma, label" },
       MODELS[1]!,
     ];
     const path = install('{"customModels":[]}\n');
@@ -81,7 +82,7 @@ describe("Factory Droid documented personal settings", () => {
     expect(JSON.parse(exported.text)).toEqual(document);
     expect(fragments.map(fragment => fragment.value)).toEqual(document.customModels);
     expect(fragments.map(fragment => fragment.path)).toEqual([
-      ["customModels", `[v2:model=mock/text,baseUrl=${BASE}]`],
+      ["customModels", "[v2:model=mock/text,displayName=OpenCodex: Text]"],
     ]);
     expect(applyIntegration(input).ok).toBe(true);
     expect(read(path).customModels.map(row => row.model)).toEqual(["mock/text"]);
@@ -126,6 +127,54 @@ describe("Factory Droid documented personal settings", () => {
     const opId = store.listOperations("droid")[0]!.opId;
     expect(restoreIntegration({ ...request(), opId }).ok).toBe(true);
     expect(readFileSync(path, "utf8")).toBe(seed);
+  });
+
+  test("IPv6 loopback exports every row and disable/restore round-trip exact bytes", () => {
+    const seed = '{\n  "theme": "dark",\n  "customModels": []\n}\n';
+    const path = install(seed);
+    const input = { ...request(), config: { ...CONFIG, hostname: "::1" } };
+    const ipv6Base = "http://[::1]:10100/v1";
+    const exported = buildClientConfigText("droid", { baseUrl: ipv6Base, models: MODELS, config: input.config });
+    expect((exported.document as DroidGeneratedConfig).customModels.map(row => row.baseUrl)).toEqual([ipv6Base, ipv6Base]);
+    expect(readIntegrationState(input).state).toBe("absent");
+    expect(previewIntegration(input, { operation: "apply" }).canApply).toBe(true);
+    expect(applyIntegration(input).ok).toBe(true);
+    const applied = readFileSync(path, "utf8");
+    expect(read(path).customModels).toHaveLength(MODELS.length);
+    const applyOpId = store.listOperations("droid")[0]!.opId;
+    expect(disableIntegration(input).ok).toBe(true);
+    expect(read(path).customModels).toEqual([]);
+    const disableOpId = store.listOperations("droid")[0]!.opId;
+    expect(restoreIntegration({ ...input, opId: disableOpId }).ok).toBe(true);
+    expect(readFileSync(path, "utf8")).toBe(applied);
+    expect(restoreIntegration({ ...input, opId: applyOpId }).ok).toBe(true);
+    expect(readFileSync(path, "utf8")).toBe(seed);
+  });
+
+  test("a foreign row with the same model and different displayName remains untouched", () => {
+    const foreign = { model: MODELS[0]!.namespaced, displayName: "Personal", baseUrl: BASE, provider: "generic-chat-completion-api" };
+    const path = install(JSON.stringify({ customModels: [foreign] }) + "\n");
+    expect(applyIntegration(request()).ok).toBe(true);
+    expect(read(path).customModels[0]).toEqual(foreign);
+    expect(disableIntegration(request()).ok).toBe(true);
+    expect(read(path).customModels).toEqual([foreign]);
+  });
+
+  test("a nonempty catalog with no addressable rows refuses before mutation", () => {
+    const models: ExportModel[] = [
+      { namespaced: "mock/a,b", provider: "mock", id: "a,b" },
+      { namespaced: "mock/c]d", provider: "mock", id: "c]d" },
+    ];
+    const seed = '{"customModels":[]}\n';
+    const path = install(seed);
+    const input = request(models);
+    expect(() => buildClientConfigText("droid", { baseUrl: BASE, models, config: CONFIG })).toThrow("no addressable models");
+    expect(readIntegrationState(input).state).toBe("unsafe");
+    expect(previewIntegration(input, { operation: "apply" })).toMatchObject({ canApply: false, refusalReason: "unsafe" });
+    expect(applyIntegration(input).ok).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(seed);
+    expect(store.listOperations("droid")).toHaveLength(0);
+    expect(existsSync(join(store.root, "snapshots", "droid"))).toBe(false);
   });
 
   test("refuses ambiguous rows, symlink targets, and edited managed rows", () => {

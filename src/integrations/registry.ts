@@ -98,11 +98,10 @@ export interface IntegrationClientSpec {
    * Derive the config path AND the detect directory from one resolution, for a
    * client whose paths depend on mutable state rather than only env and home.
    *
-   * Only Aside needs this. Its two paths both come from the account id in
-   * `accounts.json`, so calling `configPath` and `detectDir` in sequence can
-   * straddle an account switch and check one account's install while writing
-   * another's catalog. Reading the id once and deriving both paths from it
-   * removes the window instead of narrowing it.
+   * Aside needs this because both paths come from the account id in
+   * `accounts.json`: one read prevents an account switch between resolutions.
+   * Droid uses the same seam to check competing settings against the export
+   * context before status, preview, or mutation proceeds.
    */
   resolvePaths?: (env?: NodeJS.ProcessEnv, home?: string, exportContext?: ExportContext) => { configPath: string; detectDir: string };
   /**
@@ -142,8 +141,10 @@ export function resolveIntegrationPaths(
 }
 
 export function assertDroidPathsUnambiguous(root: string, exportContext?: ExportContext): void {
-  const generated = exportContext ? buildDroidClientConfig(exportContext).customModels : [];
-  try { assertDroidSettingsUnambiguous(root, exportContext?.baseUrl, generated.map(row => row.model)); }
+  try {
+    const generated = exportContext ? buildDroidClientConfig(exportContext).customModels : [];
+    assertDroidSettingsUnambiguous(root, exportContext?.baseUrl, generated.map(row => row.model));
+  }
   catch (error) { throw new ClientPathError((error as Error).message); }
 }
 
