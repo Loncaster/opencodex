@@ -22,8 +22,11 @@ account is not a substitute for the disposable account, container, or VM. Set al
 `OPENCODEX_CLAUDE_DESKTOP_CONFIG_DIR` to distinct directories inside it before startup.
 Confirm the effective OS home belongs to the disposable account. Do not copy personal
 tokens, client configuration, shell profiles, or keychain contents into this environment.
-Start from a clean environment or inspect inherited path overrides before launching;
-`CODEX_SQLITE_HOME` otherwise takes precedence over `CODEX_HOME` for Codex state.
+Start from a clean environment or inspect inherited path overrides before launching.
+Codex SQLite state resolves in this order: a root `sqlite_home` key in
+`CODEX_HOME/config.toml`, then `CODEX_SQLITE_HOME`, then `CODEX_HOME` itself. Keep the
+scratch `CODEX_HOME/config.toml` free of an outside `sqlite_home`, resolve the effective
+SQLite home with that precedence, and abort unless it is inside the scratch directory.
 
 Save a scratch `config.json` under `OPENCODEX_HOME` with an unused loopback port:
 
