@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 
 export type MacOSProxyReader = () => string | null;
 export type MacOSSystemProxyResult =
-  | { kind: "proxy"; httpUrl?: string; httpsUrl?: string; exceptions: string[] }
+  | { kind: "proxy"; httpUrl?: string; httpsUrl?: string; exceptions: string[]; droppedLinkLocal: boolean }
   | { kind: "disabled" | "unreadable" | "unsafe-exceptions" };
 
 function readScutilProxy(): string {
@@ -26,12 +26,24 @@ function proxyUrl(host: string | undefined, port: string | undefined): string | 
   }
 }
 
-// Bun's no_proxy parser matches names by suffix, even bare "localhost". The only
-// macOS exceptions we can translate without changing their scope are IP literals
-// and the all-host wildcard. CIDR, domain glob, and simple-host rules must refuse
-// discovery rather than quietly proxy a host macOS intended to send direct.
-function translateException(value: string): string | undefined {
+// Bun matches a leading-dot entry at DNS-label boundaries and also bypasses the
+// bare apex. Translating "*.local" to ".local" therefore widens only to "local";
+// other glob shapes are refused. Bun cannot represent the default link-local
+// CIDRs, so they are dropped with a diagnostic instead of blocking discovery.
+// null means one of those exact ranges was dropped; undefined refuses discovery.
+function translateException(value: string): string | null | undefined {
   if (value === "*") return value;
+  if (value === "169.254/16" || value === "169.254.0.0/16") return null;
+  const ipv6Range = /^(?:\[([0-9a-f:]+)\]|([0-9a-f:]+))\/10$/i.exec(value);
+  const ipv6Base = ipv6Range?.[1] ?? ipv6Range?.[2];
+  if (ipv6Base && isIP(ipv6Base) === 6
+    && new URL(`http://[${ipv6Base}]`).hostname === "[fe80::]") return null;
+  if (value.startsWith("*.")) {
+    const domain = value.slice(2);
+    if (domain.length > 253 || !domain.split(".").every(label => label.length <= 63
+      && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label))) return undefined;
+    return `.${domain.toLowerCase()}`;
+  }
   if (isIP(value) === 4) {
     const canonical = new URL(`http://${value}`).hostname;
     return value === canonical ? value : undefined;
@@ -92,7 +104,9 @@ export function readMacOSSystemProxy(reader: MacOSProxyReader = readScutilProxy)
     const httpsUrl = httpsEnabled ? proxyUrl(values.get("HTTPSProxy"), values.get("HTTPSPort")) : undefined;
     if ((httpEnabled && !httpUrl) || (httpsEnabled && !httpsUrl)) return { kind: "unreadable" };
     return httpUrl || httpsUrl
-      ? { kind: "proxy", httpUrl, httpsUrl, exceptions: translated.filter((value): value is string => value !== undefined) }
+      ? { kind: "proxy", httpUrl, httpsUrl,
+          exceptions: translated.filter((value): value is string => typeof value === "string"),
+          droppedLinkLocal: translated.includes(null) }
       : { kind: "disabled" };
   } catch {
     return { kind: "unreadable" };

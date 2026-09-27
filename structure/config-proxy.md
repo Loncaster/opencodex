@@ -15,7 +15,7 @@ matcher treats a bare `localhost` or IP-literal entry as one host, never a suffi
 `ALL_PROXY` and `all_proxy` provide SOCKS and HTTP(S) together, the SOCKS wrapper forces an exact
 `localhost` request direct while keeping the address-only environment bypass. An inherited non-empty
 lowercase `no_proxy`, which Bun fetch reads first with suffix matching, receives only the loopback
-addresses, never a name it would match as a suffix. When the
+addresses from the shared path; macOS auto-discovery adds its translated exceptions separately. When the
 environment no longer selects SOCKS, activation
 restores the native fetch; removing a saved field alone does not erase inherited
 process environment variables.
@@ -34,12 +34,18 @@ redaction by the normalized final path segment, matching lookup and mutation sem
 
 On macOS, `src/config/macos-system-proxy.ts` reads the top-level static HTTP/HTTPS
 settings from `/usr/sbin/scutil --proxy` once, with a timeout and output bound.
-Only enabled schemes are installed. PAC/WPAD, simple-host bypasses, malformed
-settings, and exception patterns whose semantics cannot be represented safely
-refuse discovery before any proxy-environment write. Only IP literals and the
-all-host `*` exception are translated. Accepted exceptions enter both `NO_PROXY`
-and an inherited non-empty `no_proxy`, since Bun gives lowercase precedence;
-only loopback addresses are appended, never the bare `localhost` suffix.
+Only enabled schemes are installed. IP literals and the all-host `*` exception
+are translated. A single leading `*.` followed by a valid DNS name maps to
+`.<domain>`; Bun matches at label boundaries, so `foo.local` bypasses for
+`*.local` while `xlocal` does not. Bun also bypasses the bare apex `local`,
+the one widening of that translation. The exact link-local ranges
+`169.254/16`, `169.254.0.0/16`, and `fe80::/10` are omitted because Bun
+cannot represent them; one generic diagnostic says link-local IP literals
+use the proxy. Other CIDRs or glob forms, simple-host bypasses, PAC/WPAD,
+and malformed settings refuse discovery before any proxy-environment write.
+Accepted exceptions enter both `NO_PROXY` and an inherited non-empty
+`no_proxy`, since Bun gives lowercase precedence. For loopback, only addresses
+are appended, never the bare `localhost` suffix.
 Inherited SOCKS routes keep their existing uppercase bypass semantics and do
 not receive macOS exceptions. The diagnostic reports a category, never raw
 settings or credential-bearing URLs. Regression cases live in

@@ -236,6 +236,9 @@ export function applyProxyEnvWith(
         found.httpsUrl && `HTTPS ${describeProxyForLog(found.httpsUrl)}`,
       ].filter(Boolean).join(", ");
       console.log(`[opencodex] proxy "auto": using macOS system proxy ${origins}`);
+      if (found.droppedLinkLocal) {
+        console.log('[opencodex] proxy "auto": link-local IP literals use the proxy; macOS link-local range exceptions are not expressible');
+      }
       if (found.httpUrl) process.env.HTTP_PROXY = found.httpUrl;
       if (found.httpsUrl) process.env.HTTPS_PROXY = found.httpsUrl;
       // Bun gives non-empty lowercase no_proxy priority over NO_PROXY. Add the

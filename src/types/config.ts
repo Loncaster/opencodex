@@ -885,7 +885,9 @@ export interface OcxConfig {
    * Loopback stays in NO_PROXY.
    * The literal `"auto"` reads Windows WinINET or macOS static HTTP/HTTPS proxy settings
    * once at startup. Inherited scheme proxies win; on macOS, inherited ALL_PROXY also skips
-   * discovery, and unsafe system exceptions refuse discovery without environment writes.
+   * discovery. A macOS `*.<domain>` exception maps to `.<domain>` (including the apex),
+   * exact link-local CIDRs are omitted with a warning, and other unsafe exceptions
+   * refuse discovery without environment writes.
    * PAC/WPAD, SOCKS-only settings, and live changes are not followed.
    */
   proxy?: string;

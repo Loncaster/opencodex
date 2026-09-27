@@ -50,6 +50,44 @@ describe('macOS proxy: "auto" (#5853)', () => {
     expect(process.env.no_proxy?.split(",")).toContain("*");
   });
 
+  test("default macOS exceptions activate .local without routing link-local literals direct", () => {
+    process.env.NO_PROXY = "upper.example";
+    process.env.no_proxy = "lower.example";
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args) => { lines.push(args.join(" ")); };
+    try {
+      applyProxyEnvWith(config("auto"), {
+        platform: "darwin",
+        macOSReader: () => scutil(`${both}\nExceptionsList : <array> {\n0 : *.local\n1 : 169.254/16\n}`),
+      });
+    } finally { console.log = original; }
+    expect(process.env.HTTP_PROXY).toBe("http://proxy.example:8080");
+    expect(process.env.NO_PROXY?.split(",")).toContain(".local");
+    expect(process.env.no_proxy?.split(",")).toContain(".local");
+    expect(process.env.NO_PROXY).not.toContain("169.254/16");
+    expect(process.env.no_proxy).not.toContain("169.254/16");
+    expect(lines.filter(line => line.includes("link-local"))).toHaveLength(1);
+    expect(lines.join(" ")).not.toContain("169.254/16");
+    for (const hostname of ["foo.local", "a.b.local", "local"]) {
+      const url = new URL(`http://${hostname}/`);
+      expect(noProxyMatches(url, { no_proxy: process.env.no_proxy })).toBe(true);
+      expect(resolveProxyRoute(new URL(`ws://${hostname}/`))).toEqual({ kind: "direct" });
+    }
+    for (const hostname of ["xlocal", "169.254.1.2"]) {
+      const url = new URL(`http://${hostname}/`);
+      expect(noProxyMatches(url, { no_proxy: process.env.no_proxy })).toBe(false);
+      expect(resolveProxyRoute(new URL(`ws://${hostname}/`))).toEqual({ kind: "proxy", proxy: process.env.HTTP_PROXY });
+    }
+  });
+
+  test.each(["169.254/16", "169.254.0.0/16", "fe80::/10", "FE80:0:0:0:0:0:0:0/10", "[fe80::]/10"])(
+    "drops only the exact link-local range %s", exception => {
+      expect(readMacOSSystemProxy(() => scutil(`${both}\nExceptionsList : <array> {\n0 : ${exception}\n}`)))
+        .toEqual({ kind: "proxy", httpUrl: "http://proxy.example:8080", httpsUrl: "http://[::1]:8443", exceptions: [], droppedLinkLocal: true });
+    },
+  );
+
   test.each(["HTTP", "HTTPS"])("preserves %s-only settings", scheme => {
     applyProxyEnvWith(config(" AUTO "), {
       platform: "darwin",
@@ -60,7 +98,8 @@ describe('macOS proxy: "auto" (#5853)', () => {
   });
 
   test.each([
-    "localhost", "*.local", "169.254/16", "example.com", "bad entry",
+    "localhost", "example.com", "bad entry", "10.0.0.0/8", "169.254.0.0/15",
+    "fe80::/9", "fe80::1/10", "*.*.local", "foo*.local", "*.bad_name", "*.",
   ])("refuses an unrepresentable exception %s without any environment write", exception => {
     process.env.NO_PROXY = "upper.example";
     process.env.no_proxy = "lower.example";
