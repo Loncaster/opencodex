@@ -27,14 +27,23 @@ describe('macOS proxy: "auto" (#5853)', () => {
   test("enabled schemes and safe IP exceptions reach Bun's lowercase bypass", () => {
     process.env.NO_PROXY = "upper.example";
     process.env.no_proxy = "lower.example";
-    applyProxyEnvWith(config("auto", "configured.example"), {
+    applyProxyEnvWith(config("auto", "private.example"), {
       platform: "darwin",
       macOSReader: () => scutil(`${both}\nExceptionsList : <array> {\n0 : 203.0.113.7\n1 : ::1\n}`),
     });
     expect(process.env.HTTP_PROXY).toBe("http://proxy.example:8080");
     expect(process.env.HTTPS_PROXY).toBe("http://[::1]:8443");
-    expect(process.env.NO_PROXY).toBe("upper.example,configured.example,203.0.113.7,[::1],127.0.0.1,::1");
-    expect(process.env.no_proxy).toBe("lower.example,127.0.0.1,::1,[::1],203.0.113.7");
+    expect(process.env.NO_PROXY).toBe("upper.example,private.example,203.0.113.7,[::1],127.0.0.1,::1");
+    expect(process.env.no_proxy).toBe("lower.example,127.0.0.1,::1,[::1],private.example,203.0.113.7");
+    for (const hostname of ["private.example", "child.private.example"]) {
+      const url = new URL(`https://${hostname}/`);
+      expect(noProxyMatches(url, { no_proxy: process.env.no_proxy })).toBe(true);
+      expect(resolveProxyRoute(new URL(`wss://${hostname}/`))).toEqual({ kind: "direct" });
+    }
+    const unrelated = new URL("https://unrelated.example/");
+    expect(noProxyMatches(unrelated, { no_proxy: process.env.no_proxy })).toBe(false);
+    expect(resolveProxyRoute(new URL("wss://unrelated.example/")))
+      .toEqual({ kind: "proxy", proxy: "http://[::1]:8443" });
     expect(noProxyMatches(new URL("http://203.0.113.7"), { no_proxy: process.env.no_proxy })).toBe(true);
     expect(noProxyMatches(new URL("http://203.0.113.70"), { no_proxy: process.env.no_proxy })).toBe(false);
     expect(resolveProxyRoute(new URL("https://example.org"))).toEqual({ kind: "proxy", proxy: "http://[::1]:8443" });

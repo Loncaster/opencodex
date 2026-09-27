@@ -241,12 +241,15 @@ export function applyProxyEnvWith(
       }
       if (found.httpUrl) process.env.HTTP_PROXY = found.httpUrl;
       if (found.httpsUrl) process.env.HTTPS_PROXY = found.httpsUrl;
-      // Bun gives non-empty lowercase no_proxy priority over NO_PROXY. Add the
-      // proven-safe system exceptions to both; keep name-based loopback out of
-      // the suffix matcher on both paths.
-      mergeNoProxyEntries([...configuredNoProxyEntries(config), ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
+      // Bun gives non-empty lowercase no_proxy priority over NO_PROXY. Before
+      // discovery there was no proxy, so suffix matching of a configured name
+      // can only keep that name and its subdomains on their prior direct route.
+      // Add configured entries and system exceptions to both effective paths;
+      // keep name-based loopback out of the suffix matcher.
+      const configured = configuredNoProxyEntries(config);
+      mergeNoProxyEntries([...configured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
       if (process.env.no_proxy?.trim()) {
-        process.env.no_proxy = withNoProxyEntries(process.env.no_proxy, found.exceptions, LOOPBACK_ADDRESS_NO_PROXY);
+        process.env.no_proxy = withNoProxyEntries(process.env.no_proxy, [...configured, ...found.exceptions], LOOPBACK_ADDRESS_NO_PROXY);
       }
       configureSocks5Fetch();
       return;

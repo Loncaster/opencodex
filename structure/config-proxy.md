@@ -43,9 +43,13 @@ the one widening of that translation. The exact link-local ranges
 cannot represent them; one generic diagnostic says link-local IP literals
 use the proxy. Other CIDRs or glob forms, simple-host bypasses, PAC/WPAD,
 and malformed settings refuse discovery before any proxy-environment write.
-Accepted exceptions enter both `NO_PROXY` and an inherited non-empty
-`no_proxy`, since Bun gives lowercase precedence. For loopback, only addresses
-are appended, never the bare `localhost` suffix.
+Accepted exceptions and configured `noProxy` entries enter both `NO_PROXY`
+and an inherited non-empty `no_proxy`, since Bun gives lowercase precedence.
+Before macOS discovery there is no inherited proxy, so Bun's suffix matching
+of a configured name can only keep that name and its subdomains on their
+pre-discovery direct route; it cannot move a host onto the proxy. This applies
+only to macOS discovery, not inherited or explicit proxy activation. For
+loopback, only addresses are appended, never the bare `localhost` suffix.
 Inherited SOCKS routes keep their existing uppercase bypass semantics and do
 not receive macOS exceptions. The diagnostic reports a category, never raw
 settings or credential-bearing URLs. Regression cases live in
