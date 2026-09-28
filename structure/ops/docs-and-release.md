@@ -412,7 +412,7 @@ job therefore install with `--cpu='*'`, and `scripts/build-standalone.ts` refuse
 is missing, so a cross-compiled darwin-x64 or linux-arm64 binary cannot ship without its OS
 keychain binding (#6139). The loader in `src/providers/api-key-resolve.ts` uses a literal
 `require` for the same reason: `createRequire` hid the specifier from the bundler.
-`tests/providers/keyring-standalone-load.test.ts` compiles that loader and runs it from a scratch
+`tests/providers/provider-keyring-standalone-load.test.ts` compiles that loader and runs it from a scratch
 directory.
 
 Opening a release starts with the `dev` pre-move. Dispatch
