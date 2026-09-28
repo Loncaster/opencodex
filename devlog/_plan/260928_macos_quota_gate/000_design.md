@@ -139,11 +139,13 @@ Build the reservation from the request that will actually be sent. Normalize
 `PolicyRequestEvidence` using the same closed fields and defaults as dispatch
 (`contextWindow`, tools, image input, structured output, reasoning effort, service
 tier and encrypted-task requirement; see `src/routing/evaluator.ts:40-48`). Compute a
-domain-separated digest over that projection, the normalized model selector,
-thread/session binding and a canonical
-digest of the complete logical request. Only the digest crosses the admission
-contract; this prevents one admitted request from authorizing another without
-exposing its content.
+domain-separated HMAC over that projection, the normalized model selector,
+thread/session binding and a canonical digest of the complete logical request. The
+authenticated handshake establishes a short-lived binding secret unavailable to
+admission-contract observers; neither request content nor an unkeyed reusable digest
+crosses the contract. Only the keyed binding does. Both sides compare that binding
+when the reservation is issued and consumed, so observing one admitted request cannot
+authorize a different request without exposing prompt content.
 
 Funding is classified only after resolving the final wire transport and auth source
 for each concrete target. A ChatGPT bearer/account-service attempt is `chatgpt`; an
@@ -244,10 +246,14 @@ unknown `blocked_features` or `limits_progress` entries remain enforced.
    Prove `previewRouteModel()` performs no reservation. Assert off mode starts no
    optional resources and account/auth traffic remains native.
 3. Actual macOS UAT on the reported build and each intended supported replacement:
-   identify bundle/signature/build and source process/socket, capture sanitized
-   consumer-side admission receipt, naturally exhaust the account, select a known
-   independent provider in the original composer, send, and prove provider completion.
-   CLI/curl success, open stream counts and synthetic exhausted snapshots are insufficient.
+   use only an explicitly authorized test account whose quota reset time or supported
+   recovery procedure is recorded before the test. Identify bundle/signature/build and
+   source process/socket, capture a sanitized consumer-side admission receipt, naturally
+   exhaust that account, select a known independent provider in the original composer,
+   send, and prove provider completion. A disposable HOME isolates local files, not an
+   account's remote quota; it is never permission or recovery for quota exhaustion. Wait
+   for the recorded reset or perform the approved recovery after UAT. CLI/curl success,
+   open stream counts and synthetic exhausted snapshots are insufficient.
 4. Negative UAT: native ChatGPT remains quota blocked; mixed fallback cannot consume
    that lane; auth/workspace/spend restrictions survive. Verify login, plugins,
    skills, marketplace, sync, attachments and IME remain functional separately.
