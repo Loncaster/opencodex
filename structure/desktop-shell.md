@@ -418,7 +418,9 @@ validation refuses any library not signed by the app's Team ID (#6139). Ad-hoc a
 builds both fail without it; DYLD environment variables remain blocked.
 `desktop/scripts/verify-macos-runtime.sh` demands exactly those keys and then runs
 `verify-sidecar-keyring.sh`, which starts the bundled `ocx` on private homes from a scratch
-directory and fails only when the keychain binding cannot load.
+directory and requires the keychain status to report `keychainBindingLoaded: true`; the OS answer
+itself is not judged, and every wait is bounded. The release workflow runs the same check against
+the Developer ID signed bundle, since that signature decides whether the addon may load.
 
 The release workflow packages the desktop shell as `OpenCodex-<version>-macos.dmg`,
 `OpenCodex-<version>-windows-x64.msi`, `OpenCodex-<version>-linux-x86_64.AppImage`, and

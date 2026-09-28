@@ -1197,6 +1197,11 @@ The same operations are `GET`/`POST /api/providers/keychain`. After `store`, `co
 Secret Service. Backups of `config.json` therefore carry references only. Key rotation and failover
 keep working: pool entries compare by reference, so a rotation never writes plaintext back.
 
+`status` reports `keychainAvailable` and, separately, `keychainBindingLoaded`. When the binding
+loaded but the keychain is unavailable, the OS store itself did not answer (for example a locked or
+absent session). When the binding did not load, the `ocx` build is missing its native credential
+module, which is a packaging defect worth reporting.
+
 Before touching the config, `store` writes and reads back every entry; if the keychain is unavailable
 or the read-back does not match, it refuses with 503 and leaves the file as it was. At request time
 a reference that cannot be read yields no credential and one warning per key — there is no plaintext

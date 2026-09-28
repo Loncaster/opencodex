@@ -543,6 +543,21 @@ jobs:
           fi
           exit "$bad"
 
+      # The release signature is what decides whether the sidecar may dlopen Bun's extracted
+      # @napi-rs/keyring addon (#6139), so prove it on this bundle rather than on the ad-hoc PR
+      # build. Runs on dry runs too; the check stores no credential.
+      - name: Verify the signed sidecar loads its keychain binding
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r app; do
+            [ -x "$app/Contents/MacOS/ocx" ] || continue
+            found=1
+            bash desktop/scripts/verify-sidecar-keyring.sh "$app/Contents/MacOS/ocx"
+          done < <(find desktop/src-tauri/target -maxdepth 6 -type d -name '*.app')
+          [ "$found" -eq 1 ] || { echo "::error::no bundled ocx sidecar was found to verify"; exit 1; }
+
       - name: Upload desktop release
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

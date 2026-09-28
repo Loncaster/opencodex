@@ -418,6 +418,10 @@ describe("local bundle builds", () => {
     // validation refuses without this key. verify-macos-runtime.sh demands the same dictionary.
     expect(entitlements).toMatch(/<key>com\.apple\.security\.cs\.disable-library-validation<\/key>\s*<true\s*\/>/);
     expect(readFileSync(repoPath("desktop/scripts/verify-macos-runtime.sh"), "utf8")).toContain("verify-sidecar-keyring.sh");
+    const release = readFileSync(repoPath(".github/workflows/release.yml"), "utf8");
+    expect(release).toContain('bash desktop/scripts/verify-sidecar-keyring.sh "$app/Contents/MacOS/ocx"');
+    const sidecarCheck = readFileSync(repoPath("desktop/scripts/verify-sidecar-keyring.sh"), "utf8");
+    expect(sidecarCheck).toContain('value.get("keychainBindingLoaded") is not True');
   });
 
   test("summarizeAttempts decides the exit code from the per-format outcomes", () => {

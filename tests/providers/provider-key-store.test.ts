@@ -156,6 +156,20 @@ describe("store / restore", () => {
     expect(probeProviderKeychain().available).toBe(false);
   });
 
+  test("the probe tells a binding that cannot load from an unavailable OS store (#6139)", () => {
+    setProviderKeychainEntryFactoryForTests(() => { throw new Error("Cannot find module '@napi-rs/keyring'"); });
+    expect(probeProviderKeychain()).toEqual({ available: false, reason: "Cannot find module '@napi-rs/keyring'", bindingLoaded: false });
+    const locked: ProviderKeychainEntry = {
+      getPassword: () => null,
+      setPassword: () => { throw new Error("A default keychain could not be found."); },
+      deletePassword: () => false,
+    };
+    setProviderKeychainEntryFactoryForTests(() => locked);
+    expect(probeProviderKeychain()).toEqual({ available: false, reason: "A default keychain could not be found.", bindingLoaded: true });
+    setProviderKeychainEntryFactoryForTests(fakeKeychain().factory);
+    expect(probeProviderKeychain()).toEqual({ available: true });
+  });
+
   test("restore refuses a reference to another provider's keychain account", () => {
     const { store, factory } = fakeKeychain();
     setProviderKeychainEntryFactoryForTests(factory);

@@ -3,11 +3,12 @@
 # that has no node_modules anywhere above it (#6139).
 #
 # It starts the binary on private HOME, CODEX_HOME and OPENCODEX_HOME roots and a free loopback
-# port, then asks that runtime for a provider's keychain status. With a private HOME macOS finds
-# no default keychain, so the probe answers from the OS without touching any real keychain; no
-# credential is stored. Only a module-load failure fails the check: an unavailable keychain
-# session is a legitimate answer from a loaded binding, while a missing or unloadable binding is
-# the packaging defect this guards.
+# port, then asks that runtime for a provider's keychain status and requires
+# keychainBindingLoaded: true. The OS answer itself is not judged: an unavailable keychain session
+# is a legitimate answer from a loaded binding, while a binding that cannot load is the packaging
+# defect this guards. With a private HOME macOS has reported no default keychain, failing before
+# any write; if a keychain is found, the probe writes, reads back and deletes one throwaway entry.
+# No credential is stored. Every wait is bounded.
 set -euo pipefail
 
 ocx="${1:?usage: verify-sidecar-keyring.sh /path/to/ocx}"
@@ -36,15 +37,24 @@ for _ in $(seq 1 60); do
 done
 curl -fsS "http://127.0.0.1:$port/healthz" > /dev/null || { cat "$scratch/start.log" >&2; echo 'ocx did not become healthy' >&2; exit 1; }
 
-run_ocx provider keychain openai status --json > "$scratch/keychain.json"
+run_ocx provider keychain openai status --json > "$scratch/keychain.json" 2> "$scratch/keychain.log" &
+status_pid=$!
+for _ in $(seq 1 60); do
+  kill -0 "$status_pid" 2> /dev/null || break
+  sleep 0.5
+done
+if kill -0 "$status_pid" 2> /dev/null; then
+  kill "$status_pid" 2> /dev/null || true
+  echo 'ocx provider keychain status did not answer within 30 seconds' >&2
+  exit 1
+fi
+wait "$status_pid" || { cat "$scratch/keychain.log" >&2; echo 'ocx provider keychain status failed' >&2; exit 1; }
 python3 - "$scratch/keychain.json" <<'PY'
-import json, pathlib, re, sys
+import json, pathlib, sys
 value = json.loads(pathlib.Path(sys.argv[1]).read_text())
-if value.get("keychainAvailable") is True:
-    print("PASS: ocx loaded its keychain binding and the OS keychain answered")
-    raise SystemExit(0)
 reason = str(value.get("keychainUnavailableReason", ""))
-if re.search(r"Cannot find module|native binding|ERR_DLOPEN|dlopen|Team IDs", reason):
-    raise SystemExit(f"ocx could not load its keychain binding: {reason}")
-print(f"PASS: ocx loaded its keychain binding; the OS keychain itself is unavailable here ({reason})")
+if value.get("keychainBindingLoaded") is not True:
+    raise SystemExit(f"ocx could not load its keychain binding: {reason or value}")
+answer = "available" if value.get("keychainAvailable") is True else f"unavailable here ({reason.splitlines()[0] if reason else 'no reason'})"
+print(f"PASS: ocx loaded its keychain binding; the OS keychain is {answer}")
 PY

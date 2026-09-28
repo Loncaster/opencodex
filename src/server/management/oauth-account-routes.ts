@@ -946,6 +946,7 @@ export async function handleOauthAccountRoutes(ctx: ManagementContext): Promise<
       name,
       store: providerKeyStoreKind(config.providers[name]),
       keychainAvailable: probe.available,
+      keychainBindingLoaded: probe.available || probe.bindingLoaded,
       ...(probe.available ? {} : { keychainUnavailableReason: probe.reason }),
     });
   }

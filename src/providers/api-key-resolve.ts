@@ -126,17 +126,30 @@ export function providerKeyStoreKind(provider: Pick<OcxProviderConfig, "apiKey">
   return "file";
 }
 
-/** Probe the OS keychain with a throwaway account: write, read back, delete. */
-export function probeProviderKeychain(): { available: true } | { available: false; reason: string } {
+export type ProviderKeychainProbe =
+  | { available: true }
+  | { available: false; reason: string; bindingLoaded: boolean };
+
+/**
+ * Probe the OS keychain with a throwaway account: write, read back, delete. `bindingLoaded`
+ * separates a packaging defect (the credential-store binding could not load or create an entry,
+ * #6139) from an OS store that is simply unavailable, such as a locked or absent session.
+ */
+export function probeProviderKeychain(): ProviderKeychainProbe {
   const account = `probe-${process.pid}-${Date.now()}`;
+  let entry: ProviderKeychainEntry;
   try {
-    const entry = providerKeychainEntry(account);
+    entry = providerKeychainEntry(account);
+  } catch (error) {
+    return { available: false, reason: error instanceof Error ? error.message : "keychain binding unavailable", bindingLoaded: false };
+  }
+  try {
     entry.setPassword("ok");
     const back = entry.getPassword();
     try { entry.deletePassword(); } catch { /* best effort */ }
-    if (back !== "ok") return { available: false, reason: "keychain read-back did not match" };
+    if (back !== "ok") return { available: false, reason: "keychain read-back did not match", bindingLoaded: true };
     return { available: true };
   } catch (error) {
-    return { available: false, reason: error instanceof Error ? error.message : "keychain unavailable" };
+    return { available: false, reason: error instanceof Error ? error.message : "keychain unavailable", bindingLoaded: true };
   }
 }
