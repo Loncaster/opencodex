@@ -155,6 +155,14 @@ catalog rows and `requiresOpenaiAuth` are not sufficient funding evidence. Dynam
 policy or combo routes are conservatively `mixed` or `unknown` whenever their eligible
 retry graph crosses funding classes or contains an unresolved target.
 
+Before this quota-bypass admission can classify a credential-bearing target as
+`independent`, its final wire transport must provide authenticated TLS with certificate
+and hostname validation. Plaintext transport, failed validation or an unavailable TLS
+check makes the target `unknown`, and no credential may be attached before validation
+succeeds. This restriction is deliberately scoped to bypass admission: it does not
+silently rewrite the existing transport policy for requests that remain under native
+admission.
+
 For an `independent` decision, OpenCodex atomically reserves the exact ordered target
 plan before the desktop is allowed to send. The reservation closes over each allowed
 provider/model, resolved transport and opaque credential domain, plus the generations
@@ -163,7 +171,10 @@ subagent fallback must consume a member of that immutable closure and recheck al
 generations immediately before dispatch. No later configuration or health change may
 append a target. An implementation that cannot reserve the exact plan may instead
 issue an immutable allowed-target closure with the same per-attempt generation fences;
-it may not return `independent` from an unfenced preview.
+it may not return `independent` from an unfenced preview. Every member of either form
+must itself have a final `independent` funding classification. A `chatgpt`, `mixed` or
+`unknown` member makes the entire reservation ineligible for independent admission,
+even if another member of the closure is independently funded.
 
 `previewRouteModel()` remains inspection-only. Current source explicitly defines it
 as capability inspection without combo selection state (`src/router.ts:987-990`), and
