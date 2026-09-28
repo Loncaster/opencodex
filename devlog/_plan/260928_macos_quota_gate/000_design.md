@@ -14,7 +14,8 @@ Baseline: `09f8e5ebfee1cf594181dfa8e29befa0bae7e06e` (`dev`).
 - Alternatives: upstream provider-aware composer admission; a supported app-server
   adapter contract; a separate client. Compare these below.
 - Choice: upstream provider-aware admission, with a narrowly scoped OpenCodex route
-  capability if the app cannot classify the effective inference lane itself.
+  admission contract if the app cannot classify and reserve the effective inference
+  lane itself. Do not overload the existing account/provider capability booleans.
 - Why: it separates account identity from inference entitlement without modifying
   signed app contents, moving account credentials, or misrepresenting account quota.
 - Tradeoff: requires upstream desktop cooperation; an OpenCodex-only release cannot
@@ -57,6 +58,23 @@ Baseline: `09f8e5ebfee1cf594181dfa8e29befa0bae7e06e` (`dev`).
    defines provider auth/base URL independently. That does not prove the signed-in
    desktop composer honors provider-specific quota admission. All contract names
    proposed below are design placeholders, not existing OpenAI APIs or CLI flags.
+7. The current app-server protocol already exposes `account/read.requiresOpenaiAuth`,
+   `Thread.modelProvider` through `thread/read`, and
+   `modelProvider/capabilities/read`. Those are the closest supported primitives, but
+   none binds a result to one request or to the final downstream credential/transport.
+   When OpenCodex emits its injected provider-table form, the current emitter writes
+   `requires_openai_auth = true` unless the explicit authless opt-in is effective
+   (`src/codex/inject/config-toml.ts:167`; asserted by
+   `tests/codex-integration/codex-inject.test.ts:106,143`). That evidence is about the
+   `opencodex` provider's native sign-in requirement, not the funding source of a
+   provider/model selected behind the proxy.
+8. Current routing already shows why admission has to cover the complete execution
+   path. `PolicyRequestEvidence` is a closed request-derived projection
+   (`src/routing/evaluator.ts:40-48`), while Responses policy fallback retains an
+   immutable initial trace but constructs and dispatches another physical request for
+   a later candidate (`src/server/responses/policy-fallback.ts:26-72,178-205`). That is
+   useful decision evidence, but it is not a reservation of final transport/auth
+   funding or a generation fence for every physical attempt.
 
 ## Alternatives
 
@@ -88,18 +106,80 @@ model, route revision and expiry. Return `independent`, `chatgpt`, `mixed`, or
 `unknown`, plus a structured reason. This is funding scope, not an assurance that a
 turn succeeds. Preserve all non-quota policy, auth, workspace and spend restrictions.
 
-If OpenCodex needs to describe dynamic routes, add an opt-in capability module
-outside the core hot path. It returns a bounded, short-lived route lease with
-opaque request/thread binding, model id, config revision, provider/account generation,
-funding scope, expiry and runtime generation. Never return ChatGPT credentials,
-account ids or raw account-service responses. The existing native quota RPCs are unchanged.
+### Supported primitive decision
+
+Use a separate request-scoped route-admission contract. Keep the three existing
+primitives at their present scopes:
+
+- `account/read.requiresOpenaiAuth` answers whether the active configured provider
+  needs OpenAI account auth. It is not a turn entitlement.
+- `Thread.modelProvider` is the persisted provider identity. One `opencodex` thread
+  can reach several downstream providers through policy, combo and fallback routing.
+- `modelProvider/capabilities/read` describes provider-wide capabilities. A single
+  boolean there cannot describe one target in a multiplexed downstream graph.
+
+Setting `requires_openai_auth = false` is therefore not the solution. It removes the
+native login gate for the whole `opencodex` provider, including a target or fallback
+that is ultimately funded by ChatGPT, and it conflicts with the requirement to retain
+signed-in account features. Extending one of these provider-wide responses with another
+boolean has the same ambiguity and invites caching outside the lifetime of a route.
+A future upstream protocol revision may share types or discovery with the new contract,
+but must retain a distinct request/response and freshness boundary.
+
+The opt-in route-admission module stays outside the core hot path until negotiated. It
+returns a bounded, short-lived route reservation with opaque request/thread binding,
+the normalized selector and request-evidence digest, an immutable allowed-target plan,
+config/policy/provider/account/runtime generations, funding scope and expiry. Never
+return ChatGPT credentials, account ids, raw account-service responses or prompt text.
+The existing native account, quota and provider-capability RPCs remain unchanged.
+
+### Request binding and atomic route reservation
+
+Build the reservation from the request that will actually be sent. Normalize
+`PolicyRequestEvidence` using the same closed fields and defaults as dispatch
+(`contextWindow`, tools, image input, structured output, reasoning effort, service
+tier and encrypted-task requirement; see `src/routing/evaluator.ts:40-48`). Compute a
+domain-separated digest over that projection, the normalized model selector,
+thread/session binding and a canonical
+digest of the complete logical request. Only the digest crosses the admission
+contract; this prevents one admitted request from authorizing another without
+exposing its content.
+
+Funding is classified only after resolving the final wire transport and auth source
+for each concrete target. A ChatGPT bearer/account-service attempt is `chatgpt`; an
+independent provider credential is `independent`; a target capable of selecting both
+is `mixed`; missing transport/auth evidence is `unknown`. Provider names, aliases,
+catalog rows and `requiresOpenaiAuth` are not sufficient funding evidence. Dynamic
+policy or combo routes are conservatively `mixed` or `unknown` whenever their eligible
+retry graph crosses funding classes or contains an unresolved target.
+
+For an `independent` decision, OpenCodex atomically reserves the exact ordered target
+plan before the desktop is allowed to send. The reservation closes over each allowed
+provider/model, resolved transport and opaque credential domain, plus the generations
+above. Every initial attempt, retry, combo hop, policy fallback, recovery reroute and
+subagent fallback must consume a member of that immutable closure and recheck all
+generations immediately before dispatch. No later configuration or health change may
+append a target. An implementation that cannot reserve the exact plan may instead
+issue an immutable allowed-target closure with the same per-attempt generation fences;
+it may not return `independent` from an unfenced preview.
+
+`previewRouteModel()` remains inspection-only. Current source explicitly defines it
+as capability inspection without combo selection state (`src/router.ts:987-990`), and
+the count-tokens path relies on that property (`src/server/claude-messages.ts:1480-1493`).
+It must not reserve quota, accounts, pacing, spend or fallback order, and its result
+cannot mint or satisfy a send admission.
 
 On send, the app-server validates the same lease and the proxy revalidates it before
 dispatch. A route lease must constrain the actual fallback graph: an independently
 funded turn cannot silently fall back to the exhausted signed-in ChatGPT lane.
 Mixed or unresolved routes retain native admission until a supported exact route is
-selected. Invalidated leases are rejected/replanned, never used as a reason to
-falsify account state. This also prevents a check/send race when the model changes.
+selected. A request-digest mismatch, target outside the closure, consumed reservation,
+expiry or generation mismatch rejects before dispatch with a typed stale/mismatch
+result. The native client preserves the unsent draft and obtains a fresh reservation;
+it never silently changes the route. After any attempt may have reached an upstream,
+staleness stops automatic fallback rather than risking a duplicate. Invalidated leases
+are never used as a reason to falsify account state. This closes the model/config,
+policy and retry check/send races.
 
 The composer shows the authentic exhausted account gauge while allowing only the
 eligible independent route. Selecting a native ChatGPT model immediately restores
@@ -138,6 +218,9 @@ unknown `blocked_features` or `limits_progress` entries remain enforced.
   native behavior; explicit unsupported/stale diagnostic, never reported recovered.
 - Proxy unavailable: independent route is unavailable with draft retained. Do not
   silently send the same prompt through ChatGPT, duplicate a turn, or retry a write.
+- Request digest, exact target or generation mismatch: reject before dispatch and
+  retain the draft. If an upstream attempt may already have started, report unknown
+  outcome and suppress automatic replan/fallback for that submission.
 - Account logout/switch, config edit, model switch, sleep/wake or SSE reconnect:
   invalidate affected admission state and recompute; late events cannot revive it.
 - Native quota changes remain visible and cannot overwrite independent-route state;
@@ -149,13 +232,17 @@ unknown `blocked_features` or `limits_progress` entries remain enforced.
 
 ## Validation plan (not executed)
 
-1. Pure contracts: known/unknown funding; mixed fallback graphs; route revision and
-   expiry; model/thread/account switches; stale late events; unknown restrictions;
+1. Pure contracts: normalized `PolicyRequestEvidence` and request digests; final
+   transport/auth funding; known/unknown funding; mixed fallback graphs; route revision
+   and expiry; model/thread/account switches; stale late events; unknown restrictions;
    no quota-cache mutation. Static config is never treated as consumer evidence.
 2. Integration: supported consumer handshake, readiness before publication, exact
    endpoint/generation ownership, foreign/stale/replaced listener, stop/start at same
-   port, crash/reconnect, bounded frames/timeouts and cancellation. Assert off mode
-   starts no optional resources and account/auth traffic remains native.
+   port, crash/reconnect, bounded frames/timeouts and cancellation. Exercise every
+   retry/fallback path against the immutable closure, including config/policy/account
+   generation changes; prove stale rejection retains the draft and sends nothing.
+   Prove `previewRouteModel()` performs no reservation. Assert off mode starts no
+   optional resources and account/auth traffic remains native.
 3. Actual macOS UAT on the reported build and each intended supported replacement:
    identify bundle/signature/build and source process/socket, capture sanitized
    consumer-side admission receipt, naturally exhaust the account, select a known
@@ -187,6 +274,8 @@ Do not merge #5947 or #6079 as evidence that this macOS issue is solved.
 - P1: no supported native consumer hook; no provider-scoped authoritative gate;
   fallback/check-send races; unproven preservation of signed-in features; absence of
   actual exhausted-account original-composer UAT. These block a fix claim/release.
-- P2: stale runtime ownership, restart/update drift, stream/cache ordering, incomplete
-  permissions/rollback evidence and diagnostics confusing plumbing with recovery.
-  These are required lifecycle acceptance criteria, not reasons to widen interception.
+- P2: provider-wide auth/capability ambiguity, unbound request evidence, unfenced
+  retries/fallbacks or inspection-only previews treated as reservations; stale runtime
+  ownership, restart/update drift, stream/cache ordering, incomplete permissions/rollback
+  evidence and diagnostics confusing plumbing with recovery. These are required
+  acceptance criteria, not reasons to widen interception.
