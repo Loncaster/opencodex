@@ -216,7 +216,7 @@ describe("resolveMatchedPrice", () => {
   // Claude Opus 5.5 (2026-09-22): 4 / 20 / 5.00 cache write, and a 0.05x cache-hit rate (0.20)
   // rather than the 0.1x Opus 5 uses. Live discovery listed the id before any price row existed,
   // so every surface below rendered a blank cost.
-  test("claude-opus-5-5 resolves to the official Opus 5.5 price on every exposing surface", () => {
+  test("claude-opus-5-5 resolves to the official Opus 5.5 price on supported and accounting paths", () => {
     const COST4 = { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 };
     for (const provider of ["anthropic", "anthropic-apikey"]) {
       expect(resolveMatchedPrice(provider, "claude-opus-5-5"), provider).toMatchObject({
@@ -265,8 +265,8 @@ describe("resolveMatchedPrice", () => {
         status: "verified-derived",
       });
     }
-    // Preemptive rows (260923, ahead of the provider): Kiro's dotted id falls back onto the base
-    // Anthropic row, never a marked-up regional Bedrock row; the fast tiers carry the 2x rate.
+    // Kiro keeps an accounting fallback for observed or historical dotted IDs even while its
+    // static picker omits the model; the fast tiers carry the 2x rate.
     expect(resolveMatchedPrice("kiro", "claude-opus-5.5")).toMatchObject({ cost4: COST4, jawcodeProvider: "anthropic" });
     expect(resolveMatchedPrice("openrouter", "anthropic/claude-opus-5.5-fast")?.cost4)
       .toEqual({ input: 8, output: 40, cacheRead: 0.4, cacheWrite: 10 });

@@ -1,9 +1,9 @@
 # Kiro Provider
 
-Kiro uses a static picker catalog (`liveModels: false`). Claude Sonnet 5.5 remains absent from
-that catalog until Kiro publishes or wire-observation proves support; exposing the Anthropic model
-preemptively would offer a selectable route that Kiro currently rejects. Direct Anthropic and other
-provider catalogs own their Sonnet 5.5 availability independently.
+Kiro uses a static picker catalog (`liveModels: false`). A model enters that catalog only after
+Kiro publishes it or successful wire observation proves support; a vendor announcement alone is
+insufficient because preemptive rows offer selectable routes that Kiro may reject. Direct-provider
+catalogs and accounting-only price fallbacks remain independent from Kiro picker availability.
 
 Native steering follows [the shared WebSocket contract](../transports/streaming-health.md#experimental-native-mid-turn-steering); this surface's defaults remain unchanged.
 
