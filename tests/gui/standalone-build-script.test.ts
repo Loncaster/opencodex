@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { repoPath } from "../helpers/repo-root";
+import { standaloneKeyringPackage, standaloneTargets } from "../../scripts/standalone-targets";
 
 const script = await Bun.file(repoPath("scripts", "build-standalone.ts")).text();
 const targets = await Bun.file(repoPath("scripts", "standalone-targets.ts")).text();
@@ -19,4 +20,17 @@ test("standalone build script exposes supported targets and packaging contract",
   expect(script).toContain("--outfile");
   expect(script).toContain("gui/dist");
   expect(script).toContain("SHA256SUMS");
+});
+
+test("every standalone target names a keyring binding the lockfile can install (#6139)", async () => {
+  // A wrong name here would make build-standalone.ts refuse every release build, or worse,
+  // point at a package that never ships the target's addon.
+  const lock = await Bun.file(repoPath("bun.lock")).text();
+  const keyringLine = lock.split("\n").find(line => line.includes('"@napi-rs/keyring": ["@napi-rs/keyring@'));
+  expect(keyringLine).toBeDefined();
+  for (const target of standaloneTargets) {
+    expect(keyringLine).toContain(`"${standaloneKeyringPackage(target)}"`);
+  }
+  expect(() => standaloneKeyringPackage("bun-linux-riscv64")).toThrow();
+  expect(script).toContain("standaloneKeyringPackage(target)");
 });

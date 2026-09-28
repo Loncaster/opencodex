@@ -411,6 +411,15 @@ on the hosted runner before any release asset is collected.
 The macOS release combines both prepared CLI architectures with `lipo` into the
 universal external binary Tauri expects, and checks that both slices are present.
 
+The app and its `ocx` sidecar share `desktop/src-tauri/Entitlements.plist`: `allow-jit` for
+JavaScriptCore, plus `disable-library-validation` because the sidecar dlopens the
+`@napi-rs/keyring` addon Bun extracts to a temporary file, and hardened-runtime library
+validation refuses any library not signed by the app's Team ID (#6139). Ad-hoc and Developer ID
+builds both fail without it; DYLD environment variables remain blocked.
+`desktop/scripts/verify-macos-runtime.sh` demands exactly those keys and then runs
+`verify-sidecar-keyring.sh`, which starts the bundled `ocx` on private homes from a scratch
+directory and fails only when the keychain binding cannot load.
+
 The release workflow packages the desktop shell as `OpenCodex-<version>-macos.dmg`,
 `OpenCodex-<version>-windows-x64.msi`, `OpenCodex-<version>-linux-x86_64.AppImage`, and
 `OpenCodex-<version>-linux-amd64.deb`. Each artifact is collected with a `.sha256` file;

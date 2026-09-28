@@ -412,8 +412,12 @@ describe("local bundle builds", () => {
     expect(config.bundle.macOS.signingIdentity).toBeUndefined();
     const entitlements = readFileSync(repoPath("desktop/src-tauri", config.bundle.macOS.entitlements), "utf8");
     expect([...entitlements.matchAll(/<key>([^<]+)<\/key>/g)].map(match => match[1]))
-      .toEqual(["com.apple.security.cs.allow-jit"]);
+      .toEqual(["com.apple.security.cs.allow-jit", "com.apple.security.cs.disable-library-validation"]);
     expect(entitlements).toMatch(/<key>com\.apple\.security\.cs\.allow-jit<\/key>\s*<true\s*\/>/);
+    // #6139: the signed sidecar dlopens Bun's extracted @napi-rs/keyring addon, which library
+    // validation refuses without this key. verify-macos-runtime.sh demands the same dictionary.
+    expect(entitlements).toMatch(/<key>com\.apple\.security\.cs\.disable-library-validation<\/key>\s*<true\s*\/>/);
+    expect(readFileSync(repoPath("desktop/scripts/verify-macos-runtime.sh"), "utf8")).toContain("verify-sidecar-keyring.sh");
   });
 
   test("summarizeAttempts decides the exit code from the per-format outcomes", () => {

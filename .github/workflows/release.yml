@@ -152,8 +152,11 @@ jobs:
       - name: Setup project Bun
         uses: ./.github/actions/setup-project-bun
 
+      # Every architecture's optional native packages, not only the runner's: the compiled
+      # binary embeds only the @napi-rs/keyring binding that is installed, and darwin-x64 and
+      # linux-arm64 are cross-compiled here. build-standalone.ts refuses a missing one (#6139).
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --cpu='*'
 
       - name: Build dashboard
         run: bun run build:gui
@@ -274,8 +277,10 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: bun scripts/release-version-sources.ts check "$RELEASE_VERSION"
 
+      # --cpu='*': the macOS row prepares an x86_64 sidecar on an arm64 runner, and the sidecar
+      # embeds only the installed @napi-rs/keyring binding (#6139).
       - name: Install project dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --cpu='*'
 
       - name: Build dashboard
         run: bun run build:gui

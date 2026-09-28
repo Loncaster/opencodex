@@ -5,5 +5,12 @@
     <!-- The bundled Bun JavaScriptCore runtime needs MAP_JIT under hardened runtime. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
+    <!-- The bundled ocx loads the @napi-rs/keyring native addon for the OS keychain. Bun
+         extracts that embedded addon to a temporary file before dlopen, and hardened-runtime
+         library validation refuses any library that is not signed by the app's own Team ID —
+         which an extracted npm addon never is (#6139). Without this key the keychain reports
+         unavailable in every signed build. DYLD_* environment variables stay blocked. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
 </dict>
 </plist>

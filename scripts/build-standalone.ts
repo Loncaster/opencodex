@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
-import { isStandaloneTarget, standaloneExecutableName } from "./standalone-targets";
+import { isStandaloneTarget, standaloneExecutableName, standaloneKeyringPackage } from "./standalone-targets";
 
 function hostTarget(): string {
   const platform = process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "windows" : "linux";
@@ -26,6 +26,18 @@ if (!existsSync(join(guiDist, "index.html"))) {
 }
 
 const output = resolve(argumentValue("--out") ?? join(repoRoot, "dist", "standalone", target));
+
+// The compiled binary can only embed the OS credential-store binding that is installed. A
+// plain `bun install` installs the host's platform package alone, so a cross-architecture
+// target would ship a binary whose keychain path fails at runtime (#6139). Refuse instead.
+const keyringPackage = standaloneKeyringPackage(target);
+if (!existsSync(join(repoRoot, "node_modules", keyringPackage, "package.json"))) {
+  throw new Error(
+    `${keyringPackage} is not installed, so ${target} would ship without the OS keychain binding; ` +
+      "install every architecture's optional native packages first: bun install --frozen-lockfile --cpu='*'",
+  );
+}
+
 mkdirSync(output, { recursive: true });
 const executable = join(output, standaloneExecutableName(target));
 

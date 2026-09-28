@@ -1271,6 +1271,7 @@
     "provider-egress.test.ts": "lib",
     "provider-id-rewrite.test.ts": "providers",
     "provider-key-store.test.ts": "providers",
+    "keyring-standalone-load.test.ts": "providers",
     "provider-live-models.test.ts": "providers",
     "provider-model-aliases.test.ts": "providers",
     "provider-model-discovery-contract.test.ts": "providers",

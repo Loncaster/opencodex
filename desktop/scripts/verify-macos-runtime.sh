@@ -17,7 +17,11 @@ verify_member() {
 import pathlib, plistlib, re, sys
 role, entitlements, signature = sys.argv[1:]
 actual = plistlib.loads(pathlib.Path(entitlements).read_bytes())
-expected = {"com.apple.security.app-sandbox": True} if role == "widget" else {"com.apple.security.cs.allow-jit": True}
+expected = (
+    {"com.apple.security.app-sandbox": True}
+    if role == "widget"
+    else {"com.apple.security.cs.allow-jit": True, "com.apple.security.cs.disable-library-validation": True}
+)
 if actual != expected:
     raise SystemExit(f"Unexpected {role} entitlement dictionary")
 text = pathlib.Path(signature).read_text()
@@ -39,4 +43,6 @@ value = json.loads(pathlib.Path(sys.argv[1]).read_text())
 assert value.get("schema") == "ocx-resolve/1", "Unexpected resolve schema"
 assert value.get("liveness", {}).get("status") in ("live", "absent-proven"), "Unusable resolve result"
 PY
-printf '%s\n' 'PASS: macOS signatures, exact entitlements, hardened runtime, Liquid Glass and bundled CLI resolve'
+# The signed sidecar must load its embedded keychain addon from outside the bundle tree (#6139).
+bash "$(dirname "$0")/verify-sidecar-keyring.sh" "$app/Contents/MacOS/ocx"
+printf '%s\n' 'PASS: macOS signatures, exact entitlements, hardened runtime, Liquid Glass, bundled CLI resolve and keychain binding'

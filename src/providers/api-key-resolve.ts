@@ -15,8 +15,14 @@
  *
  * Policy: a reference that cannot be resolved fails closed (no key) and is warned once per
  * account; nothing ever rewrites plaintext into config or its backups.
+ *
+ * The addon is loaded with a bare `require` of a string literal on purpose (#6139). `bun build
+ * --compile` embeds only modules it can see statically; `createRequire(import.meta.url)` hides the
+ * specifier from the bundler, so the standalone and desktop-bundled `ocx` looked the package up on
+ * disk at runtime and failed with "Cannot find module" from any directory without a node_modules.
+ * The require stays inside the factory so platforms without a native binding still import this
+ * module and fail closed per call instead of at load.
  */
-import { createRequire } from "node:module";
 import { resolveEnvValue } from "../config/proxy-env";
 import type { OcxProviderConfig } from "../types";
 
@@ -31,10 +37,13 @@ export interface ProviderKeychainEntry {
 
 export type ProviderKeychainEntryFactory = (service: string, account: string) => ProviderKeychainEntry;
 
-const nodeRequire = createRequire(import.meta.url);
+/** Load the OS credential-store binding. Exported so the standalone build can prove it embeds it. */
+export function loadProviderKeyringModule(): { Entry: new (service: string, account: string) => ProviderKeychainEntry } {
+  return require("@napi-rs/keyring") as { Entry: new (service: string, account: string) => ProviderKeychainEntry };
+}
 
 function defaultEntryFactory(service: string, account: string): ProviderKeychainEntry {
-  const { Entry } = nodeRequire("@napi-rs/keyring") as { Entry: new (s: string, a: string) => ProviderKeychainEntry };
+  const { Entry } = loadProviderKeyringModule();
   return new Entry(service, account);
 }
 

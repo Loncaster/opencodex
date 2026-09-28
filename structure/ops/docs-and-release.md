@@ -405,6 +405,16 @@ The `package-standalone` job in `.github/workflows/release.yml` also builds Bun 
 `ocx` archives for Linux, macOS, and Windows, bundles `gui/dist`, smoke-tests `/healthz`, and
 publishes SHA-256 sidecars for the attach job.
 
+A compiled `ocx` embeds only the native packages installed when it is built, and a plain
+`bun install` installs the runner's architecture alone. Both the standalone job and the desktop
+job therefore install with `--cpu='*'`, and `scripts/build-standalone.ts` refuses a target whose
+`@napi-rs/keyring` platform package (`standaloneKeyringPackage` in `scripts/standalone-targets.ts`)
+is missing, so a cross-compiled darwin-x64 or linux-arm64 binary cannot ship without its OS
+keychain binding (#6139). The loader in `src/providers/api-key-resolve.ts` uses a literal
+`require` for the same reason: `createRequire` hid the specifier from the bundler.
+`tests/providers/keyring-standalone-load.test.ts` compiles that loader and runs it from a scratch
+directory.
+
 Opening a release starts with the `dev` pre-move. Dispatch
 `.github/workflows/dev-version-bump.yml` with the intended version, merge the pull request it opens,
 then promote and release. A no-op is valid when `dev` already outranks the target. `release.yml`
