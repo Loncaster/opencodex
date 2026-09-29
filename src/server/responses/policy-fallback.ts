@@ -29,13 +29,18 @@ function staysWithinPolicyAfterRedirect(
   trace: RouteDecisionTraceV1,
   candidate: RouteCandidateTrace,
 ): boolean {
+  // "blocked-model-redirect" can only arise from a configured redirect entry; without one the
+  // fallback hop reproduces the candidate's ordinary route.
+  if (Object.keys(config.blockedModelRedirects ?? {}).length === 0) return true;
   try {
     const routed = routeModel(config, `${candidate.provider}/${candidate.model}`);
     return routed.routeReason !== "blocked-model-redirect" || trace.candidates.some(allowed =>
       allowed.eligible && allowed.provider === routed.providerName && allowed.model === routed.modelId
     );
   } catch {
-    return false;
+    // A route that fails to resolve cannot redirect anywhere; the retry itself surfaces the same
+    // routing failure through the normal attempt path.
+    return true;
   }
 }
 
