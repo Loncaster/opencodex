@@ -6,6 +6,7 @@ import { fetchKiroWithRetry, resetKiroThrottleStateForTests } from "../../../src
 import { getDebugLogEntries, resetDebugLogBufferForTests } from "../../../src/lib/debug-log-buffer";
 import { clearDebugSetting, getDebugSettings, setDebugSettings } from "../../../src/lib/debug-settings";
 import { encodeMessage } from "../../../src/lib/eventstream-decoder";
+import { createRequestExecutionBudget } from "../../../src/lib/request-execution-budget";
 import type { AdapterEvent, OcxParsedRequest, OcxProviderConfig } from "../../../src/types";
 import { withTestTranslatorBudget } from "../../helpers/translator-budget";
 
@@ -160,25 +161,51 @@ test("reset recovery keeps rebuilt credentials bound to their destination", asyn
   const sends: Array<{ url: string; bearer: string; body: string }> = [];
   const mutable = { ...request };
   const executor = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (sends.length === 0) {
+    sends.push({
+      url: String(input),
+      bearer: new Headers(init?.headers).get("authorization") ?? "",
+      body: String(init?.body),
+    });
+    if (sends.length === 1) {
       mutable.url = "https://replacement.invalid/";
       mutable.headers = { authorization: "Bearer replacement" };
       mutable.body = "replacement-body";
-      sends.push({ url: mutable.url, bearer: "Bearer replacement", body: mutable.body });
-    } else {
-      sends.push({
-        url: String(input),
-        bearer: new Headers(init?.headers).get("authorization") ?? "",
-        body: String(init?.body),
-      });
     }
     if (sends.length === 1) throw Object.assign(new Error("reset"), { code: "ECONNRESET" });
     return new Response("ok");
   }) as typeof fetch;
   await fetchKiroWithRetry(mutable, { executor, timeoutMs: 5_000 });
   expect(sends).toEqual([
+    { url: "https://runtime.us-east-1.kiro.dev/", bearer: "Bearer old", body: "old-body" },
     { url: mutable.url, bearer: "Bearer replacement", body: "replacement-body" },
-    { url: mutable.url, bearer: "Bearer replacement", body: "replacement-body" },
+  ]);
+});
+
+test("a reset rebuild keeps its region's gateway fallback inside the request budget", async () => {
+  const urls: string[] = [];
+  const mutable = { ...request };
+  const executor = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    if (urls.length === 1) {
+      mutable.url = "https://runtime.eu-west-1.kiro.dev/";
+      mutable.headers = { authorization: "Bearer eu" };
+      mutable.body = "eu-body";
+      throw Object.assign(new Error("reset"), { code: "ECONNRESET" });
+    }
+    if (urls.length === 2) return responseWithUrl(503, "https://runtime.eu-west-1.kiro.dev/");
+    return new Response("ok");
+  }) as typeof fetch;
+  await fetchKiroWithRetry(mutable, {
+    executor,
+    sendBudget: createRequestExecutionBudget(),
+    timeoutMs: 5_000,
+  });
+  // us-east send, reset, rebuild moved to eu-west canonical, its 503 rotates to the
+  // eu-west legacy host -- the rebuild move must not have spent the one transition.
+  expect(urls).toEqual([
+    "https://runtime.us-east-1.kiro.dev/",
+    "https://runtime.eu-west-1.kiro.dev/",
+    "https://q.eu-west-1.amazonaws.com/",
   ]);
 });
 
