@@ -121,7 +121,7 @@ describe("Gemini tool schema type arrays", () => {
     expect(JSON.stringify(out)).not.toContain('"type":[');
   });
 
-  test("type-specific keywords stay on their typed branch", () => {
+  test("type-specific keywords stay beside the type union without being duplicated", () => {
     const out = normalizeDevinToolParameters("gemini-3-8-flash-medium", {
       type: "object",
       properties: {
@@ -130,10 +130,10 @@ describe("Gemini tool schema type arrays", () => {
       },
     }) as any;
     expect(out.properties.list).toEqual({
-      description: "d", anyOf: [{ type: "array", items: { type: "string" }, minItems: 1 }, { type: "null" }],
+      description: "d", items: { type: "string" }, minItems: 1, anyOf: [{ type: "array" }, { type: "null" }],
     });
     expect(out.properties.obj).toEqual({
-      anyOf: [{ type: "object", properties: { a: { type: "string" } }, required: ["a"] }, { type: "null" }],
+      properties: { a: { type: "string" } }, required: ["a"], anyOf: [{ type: "object" }, { type: "null" }],
     });
   });
 
@@ -143,7 +143,8 @@ describe("Gemini tool schema type arrays", () => {
     }) as any;
     expect(out).toEqual({
       allOf: [
-        { anyOf: [{ maxLength: 5, type: "string" }, { type: "null" }] },
+        { maxLength: 5 },
+        { anyOf: [{ type: "string" }, { type: "null" }] },
         { anyOf: [{ maxLength: 50 }, { type: "null" }] },
       ],
     });
@@ -155,24 +156,29 @@ describe("Gemini tool schema type arrays", () => {
     }) as any;
     expect(out).toEqual({
       allOf: [
-        { anyOf: [{ minLength: 2, type: "string" }, { type: "null" }] },
+        { minLength: 2 },
+        { anyOf: [{ type: "string" }, { type: "null" }] },
         { anyOf: [{ type: "integer" }] },
       ],
     });
   });
 
-  test("an existing anyOf that agrees with the outer keywords is folded in, not nested under allOf", () => {
+  test("an existing anyOf remains a separate constraint", () => {
     const out = normalizeDevinToolParameters("MODEL_GOOGLE_GEMINI_2_5_PRO", {
       type: ["object", "null"], anyOf: [{ required: ["a"] }, { required: ["b"] }],
     }) as any;
-    expect(out.allOf).toBeUndefined();
-    expect(out.anyOf).toEqual([
-      { required: ["a"], type: "object" }, { required: ["b"], type: "object" }, { type: "null" },
+    expect(out.allOf).toEqual([
+      { anyOf: [{ type: "object" }, { type: "null" }] },
+      { anyOf: [{ required: ["a"] }, { required: ["b"] }] },
     ]);
     const typed = normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], anyOf: [{ type: "string", format: "date" }, { type: "integer" }],
     }) as any;
-    expect(typed).toEqual({ type: "string", format: "date" });
+    expect(typed).toEqual({
+      allOf: [{ anyOf: [{ type: "string" }, { type: "null" }] }, {
+        anyOf: [{ type: "string", format: "date" }, { type: "integer" }],
+      }],
+    });
   });
 
   test("outer enum and const exclude null from a Gemini type union", () => {
@@ -199,19 +205,25 @@ describe("Gemini tool schema type arrays", () => {
     expect(normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], not: { type: "null" },
     })).toEqual({
-      allOf: [
-        { anyOf: [{ type: "string" }, { type: "null" }] },
-        { not: { type: "null" } },
-      ],
+      not: { type: "null" },
+      anyOf: [{ type: "string" }, { type: "null" }],
     });
     expect(normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], oneOf: [{ type: "string" }, { const: "x" }],
     })).toEqual({
-      allOf: [
-        { anyOf: [{ type: "string" }, { type: "null" }] },
-        { oneOf: [{ type: "string" }, { const: "x" }] },
-      ],
+      oneOf: [{ type: "string" }, { const: "x" }],
+      anyOf: [{ type: "string" }, { type: "null" }],
     });
+  });
+
+  test("nested multi-type schemas grow linearly", () => {
+    let nested: unknown = { type: "string" };
+    for (let depth = 0; depth < 24; depth += 1) {
+      nested = { type: ["object", "array"], properties: { child: nested } };
+    }
+    const encoded = JSON.stringify(normalizeDevinToolParameters("gemini-x", nested));
+    expect(encoded.length).toBeLessThan(5_000);
+    expect(encoded.match(/"child"/g)).toHaveLength(24);
   });
 
   test("draft-7 dependencies: schema values are rewritten, name lists are left alone", () => {
