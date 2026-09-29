@@ -232,12 +232,23 @@ function unknown(reason: string): ServiceManagerInstallation {
   return { kind: "unknown", reason };
 }
 
+/** Decode the entities buildPlist's plistString applies. `&amp;` goes last so a
+ *  literal `&amp;lt;` written by a double-escaped value stays `&lt;`. */
+function plistStringValue(raw: string): string {
+  return raw
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 /** Pull `<key>NAME</key><string>VALUE</string>` out of a plist body. */
 function plistEnvValue(body: string, key: string): string | null {
   const match = body.match(
     new RegExp(`<key>\\s*${key}\\s*</key>\\s*<string>([^<]*)</string>`),
   );
-  return match ? match[1] : null;
+  return match ? plistStringValue(match[1]) : null;
 }
 
 /** Pull `Environment="NAME=VALUE"` (quoted or bare) out of a systemd unit. */

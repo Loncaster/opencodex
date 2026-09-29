@@ -188,6 +188,19 @@ describe("absence has to be proven twice", () => {
     expect(result.claims[0].homes).toEqual({ codexHome: "/somewhere/.codex", opencodexHome: "/somewhere/.opencodex" });
   });
 
+  test("XML-escaped home values decode back to the installed home", () => {
+    writePlist("/Users/A/R&amp;D/.codex", "/Users/A/R&amp;D/.opencodex");
+    const { run } = recorder(() => ({ status: 113 }));
+    const result = inspectServiceManagerInstallation({ run, platform: "darwin", uid: 501, home });
+    expect(result.kind).toBe("present");
+    if (result.kind !== "present") return;
+    // The writer escapes XML; a raw compare would read a foreign home and skip delegation.
+    expect(result.claims[0].homes).toEqual({
+      codexHome: "/Users/A/R&D/.codex",
+      opencodexHome: "/Users/A/R&D/.opencodex",
+    });
+  });
+
   test("a registration with no definition file is unknown, not present", () => {
     const { run } = recorder(() => ({ status: 0, stdout: "state = running" }));
     const result = inspectServiceManagerInstallation({ run, platform: "darwin", uid: 501, home });

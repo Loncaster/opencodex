@@ -33,7 +33,7 @@ import { assertNotRealHomeUnderTest } from "../lib/test-home-guard";
 import { atomicWriteFile } from "./atomic-write";
 import { getConfigDir } from "./paths";
 import { ConfigMutationLockError, withConfigMutationLockSync } from "./mutation-lock";
-import { inspectServiceManagerInstallation } from "../service-manager-probe";
+import { inspectServiceManagerInstallation, type ServiceManagerClaim } from "../service-manager-probe";
 import { compareServicePathToInstall, currentServiceHomes, SERVICE_MANAGED_ENV } from "../service/state";
 import { WINDOWS_WRAPPER_PROTOCOL_ENV } from "../service/windows-wrapper-exit";
 
@@ -254,6 +254,29 @@ export function selectNewerServingRuntime(
   return best === null ? null : { ...best.record, version: best.version };
 }
 
+/**
+ * Whether the census names a command different from self that records a newer
+ * version and still exists on disk. Cheap and spawn-free: use it to gate the
+ * expensive service-manager provenance probe instead of probing on every start.
+ */
+export function hasNewerRecordedServingRuntime(
+  selfVersion: string,
+  selfCommand: readonly string[],
+  deps: NewerServingRuntimeDeps = {},
+): boolean {
+  const self = parseStrictSemver(selfVersion);
+  if (self === null) return false;
+  const exists = deps.exists ?? existsSync;
+  const selfKey = servingRuntimeCommandKey(selfCommand);
+  return readServingRuntimes(deps.dir ?? getConfigDir())
+    .filter(record => servingRuntimeCommandKey(record.command) !== selfKey)
+    .filter(record => {
+      const recorded = parseStrictSemver(record.version);
+      return recorded !== null && compareStrictSemver(recorded, self) > 0;
+    })
+    .some(record => record.command.every(part => exists(part) && trustedRecordedPath(part)));
+}
+
 export interface DeferToNewerRuntimeDeps extends NewerServingRuntimeDeps {
   readonly runInherited?: (command: readonly string[], args: readonly string[]) => Promise<DelegatedExit>;
   readonly log?: (line: string) => void;
@@ -261,6 +284,8 @@ export interface DeferToNewerRuntimeDeps extends NewerServingRuntimeDeps {
   readonly env?: NodeJS.ProcessEnv;
   /** Test seam for the manager-definition provenance check at the pre-probe gate. */
   readonly installedServiceOwnsCurrentHome?: () => boolean;
+  /** Test seam for the recorded-candidate gate that keeps the manager probe off empty censuses. */
+  readonly hasNewerRecordedRuntime?: () => boolean;
 }
 
 interface DelegatedExit { readonly exitCode: number; readonly ready: boolean }
@@ -400,6 +425,11 @@ export async function deferServiceChildToNewerRuntime(options: {
   readonly deps?: DeferToNewerRuntimeDeps;
 }): Promise<number | null> {
   if (options.sibling || !isManagedServiceEnvironment(options.env) || options.env[DELEGATED_ONCE_ENV] === "1") return null;
+  // Cheap gate first: with no recorded newer candidate there is nothing to delegate to, so
+  // the manager-definition probe (a potential full Task Scheduler listing) must not run.
+  const hasCandidate = options.deps?.hasNewerRecordedRuntime
+    ?? (() => hasNewerRecordedServingRuntime(options.selfVersion, options.selfCommand, options.deps));
+  if (!hasCandidate()) return null;
   const installedServiceOwnsCurrentHome = options.deps?.installedServiceOwnsCurrentHome
     ?? serviceManagerOwnsCurrentHome;
   // Bun may populate the live environment from a project-controlled dotenv file. Markers
@@ -409,15 +439,31 @@ export async function deferServiceChildToNewerRuntime(options: {
   return deferToNewerServiceRuntime(options.selfVersion, options.selfCommand, options.port, { env: options.env, ...options.deps });
 }
 
+/**
+ * A claim's null home key means the definition omitted it, which only happens for a
+ * default-home install. Such a claim authorizes nothing when the current process resolved
+ * a non-default home — otherwise a project .env setting the env var plus the service marker
+ * would borrow a default install's registration for a project-chosen census directory.
+ */
+export function serviceClaimMatchesCurrentHomes(
+  claim: ServiceManagerClaim,
+  current: { codexHome: string; opencodexHome: string },
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (claim.homes.codexHome === null
+      ? !env.CODEX_HOME?.trim()
+      : compareServicePathToInstall(claim.homes.codexHome, current.codexHome) === "same")
+    && (claim.homes.opencodexHome === null
+      ? !env.OPENCODEX_HOME?.trim()
+      : compareServicePathToInstall(claim.homes.opencodexHome, current.opencodexHome) === "same");
+}
+
 function serviceManagerOwnsCurrentHome(): boolean {
   const current = currentServiceHomes();
   const installation = inspectServiceManagerInstallation({ configDir: current.opencodexHome });
   if (installation.kind !== "present") return false;
   return installation.claims.some(claim => claim.registration === "present"
-    && (claim.homes.codexHome === null
-      || compareServicePathToInstall(claim.homes.codexHome, current.codexHome) === "same")
-    && (claim.homes.opencodexHome === null
-      || compareServicePathToInstall(claim.homes.opencodexHome, current.opencodexHome) === "same"));
+    && serviceClaimMatchesCurrentHomes(claim, current));
 }
 
 /**

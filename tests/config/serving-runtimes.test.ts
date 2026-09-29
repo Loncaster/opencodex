@@ -6,12 +6,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   deferServiceChildToNewerRuntime,
+  hasNewerRecordedServingRuntime,
   isManagedServiceEnvironment,
   deferToNewerServiceRuntime,
   probeServedRuntimeVersion,
   readServingRuntimes,
   recordServingRuntime,
   selectNewerServingRuntime,
+  serviceClaimMatchesCurrentHomes,
   servingRuntimeCommandKey,
   servingRuntimesPath,
   type ServedRuntimeRecord,
@@ -503,6 +505,65 @@ describe("deferServiceChildToNewerRuntime", () => {
       env: { OCX_SERVICE_MANAGED: "1" },
       deps: { ...deps, runInherited: async () => ({ exitCode: 42, ready: true }) },
     })).toBe(42);
+  });
+
+  test("an empty census never reaches the manager probe", async () => {
+    // The 401-task listing a localized Windows host pays for /query is real work;
+    // with nothing recorded there is no candidate to prove provenance for.
+    const dir = freshDir();
+    let probes = 0;
+    expect(await deferServiceChildToNewerRuntime({
+      sibling: false,
+      env: { OCX_SERVICE_MANAGED: "1" },
+      selfVersion: "2.67.0",
+      selfCommand: [join("/", "npm", "bun.exe"), join("/", "npm", "index.ts")],
+      deps: {
+        dir,
+        exists: () => true,
+        installedServiceOwnsCurrentHome: () => { probes += 1; return true; },
+        run: () => ({ status: 0, stdout: "", stderr: "" }),
+        runInherited: async () => ({ exitCode: 0, ready: true }),
+        log: () => {},
+      },
+    })).toBeNull();
+    expect(probes).toBe(0);
+  });
+
+  test("hasNewerRecordedServingRuntime ignores self, stale, and missing commands", () => {
+    const dir = freshDir();
+    const self = [join("/", "npm", "bun.exe"), join("/", "npm", "index.ts")];
+    expect(hasNewerRecordedServingRuntime("2.67.0", self, { dir })).toBe(false);
+    recordServingRuntime(record(self, "2.68.0"), dir);
+    recordServingRuntime(record([fakeBinary(dir, "older.exe")], "2.66.0"), dir);
+    recordServingRuntime(record([join(dir, "missing.exe")], "2.70.0"), dir);
+    expect(hasNewerRecordedServingRuntime("2.67.0", self, { dir })).toBe(false);
+    recordServingRuntime(record([fakeBinary(dir, "newer.exe")], "2.68.0"), dir);
+    expect(hasNewerRecordedServingRuntime("2.67.0", self, { dir, exists: () => true })).toBe(true);
+  });
+
+  test("a claim omitting home keys only authorizes a default-home process", () => {
+    const dir = freshDir();
+    const current = { codexHome: join(dir, ".codex"), opencodexHome: join(dir, ".opencodex") };
+    const omitted = {
+      backend: "launchd" as const,
+      definitionPath: join(dir, "com.opencodex.proxy.plist"),
+      homes: { codexHome: null, opencodexHome: null },
+      registration: "present" as const,
+    };
+    // A project-controlled .env can set both vars; the omitted-key claim must not
+    // follow them to a project-chosen home.
+    expect(serviceClaimMatchesCurrentHomes(omitted, current, {
+      CODEX_HOME: current.codexHome, OPENCODEX_HOME: current.opencodexHome,
+    })).toBe(false);
+    expect(serviceClaimMatchesCurrentHomes(omitted, current, {})).toBe(true);
+    // A recorded home still must match the current one.
+    const recorded = { ...omitted, homes: { codexHome: current.codexHome, opencodexHome: current.opencodexHome } };
+    expect(serviceClaimMatchesCurrentHomes(recorded, current, {})).toBe(true);
+    expect(serviceClaimMatchesCurrentHomes(recorded, current, {
+      CODEX_HOME: current.codexHome, OPENCODEX_HOME: current.opencodexHome,
+    })).toBe(true);
+    const foreign = { ...omitted, homes: { codexHome: "/elsewhere/.codex", opencodexHome: current.opencodexHome } };
+    expect(serviceClaimMatchesCurrentHomes(foreign, current, {})).toBe(false);
   });
 
   test("a generated WinSW service child delegates to a newer recorded install", async () => {
