@@ -53,8 +53,18 @@ function splitTypeArray(node: Schema, types: unknown[]): Schema {
   const typeConstraint: Schema = branches.length === 1 ? branches[0]! : { anyOf: branches };
   const existing = Array.isArray(node.anyOf) ? node.anyOf : undefined;
   if (!existing) return { ...annotations, ...rest, ...typeConstraint };
+  // unevaluatedProperties/unevaluatedItems read annotations from sibling
+  // applicators in their own subschema, so they cannot sit inside one allOf
+  // branch while the anyOf they observe sits in another. Keep them on the node.
+  const elevated: Schema = {};
+  for (const key of ['unevaluatedProperties', 'unevaluatedItems']) {
+    if (Object.hasOwn(rest, key)) {
+      elevated[key] = rest[key];
+      delete rest[key];
+    }
+  }
   const constraints = Object.keys(rest).length === 0 ? [] : [rest];
-  return { ...annotations, allOf: [...constraints, typeConstraint, { anyOf: existing }] };
+  return { ...annotations, ...elevated, allOf: [...constraints, typeConstraint, { anyOf: existing }] };
 }
 
 function rewrite(node: unknown): unknown {

@@ -201,6 +201,25 @@ describe("Gemini tool schema type arrays", () => {
     });
   });
 
+  test("unevaluated annotations stay on the node so a sibling anyOf still counts as evaluated", () => {
+    const out = normalizeDevinToolParameters("gemini-x", {
+      type: ["object", "null"],
+      unevaluatedProperties: false,
+      unevaluatedItems: false,
+      anyOf: [{ properties: { a: { type: "string" } } }, { type: "null" }],
+    }) as any;
+    expect(out.unevaluatedProperties).toBe(false);
+    expect(out.unevaluatedItems).toBe(false);
+    // Inside one allOf branch these keywords would lose the sibling anyOf's
+    // evaluation annotations and reject valid arguments.
+    expect(JSON.stringify(out.allOf)).not.toContain("unevaluatedProperties");
+    expect(JSON.stringify(out.allOf)).not.toContain("unevaluatedItems");
+    expect(out.allOf).toEqual([
+      { anyOf: [{ type: "object" }, { type: "null" }] },
+      { anyOf: [{ properties: { a: { type: "string" } } }, { type: "null" }] },
+    ]);
+  });
+
   test("outer not and oneOf still constrain the null branch", () => {
     expect(normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], not: { type: "null" },
