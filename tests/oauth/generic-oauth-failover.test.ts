@@ -452,6 +452,23 @@ describe("sidecar on429 wiring", () => {
     expect(arm.match(/oauthCredentialSnapshot: transportState\.replayOAuthCredentialSnapshot/g)).toHaveLength(4);
   });
 
+  test("Kiro refusal rotation rebinds continuation ownership before replay", () => {
+    const refusalStart = coreSource.indexOf("// Generic OAuth account failover (#2568)");
+    const armStart = coreSource.indexOf('if (route.providerName === "kiro")', refusalStart);
+    const armEnd = coreSource.indexOf("} else {", armStart);
+    const arm = coreSource.slice(armStart, armEnd);
+    const applied = arm.indexOf("applyFailoverSnapshot(snapshot)");
+    const rebound = arm.indexOf("bindRouteReasoningReplayScope({", applied);
+    const replayed = arm.indexOf('rebuildAndRefetch("oauth-account-429"', rebound);
+
+    expect(applied).toBeGreaterThan(-1);
+    expect(rebound).toBeGreaterThan(applied);
+    expect(replayed).toBeGreaterThan(rebound);
+    expect(arm.slice(rebound, replayed)).toContain(
+      "oauthCredentialSnapshot: transportState.replayOAuthCredentialSnapshot",
+    );
+  });
+
   test("every 429 recovery loop carries all three rotators (#3495 follow-up)", () => {
     // This unit found the same defect twice: the streaming loop grew generic OAuth rotation and
     // the continuation loop did not, and the sidecar hook grew generic rotation while Anthropic
