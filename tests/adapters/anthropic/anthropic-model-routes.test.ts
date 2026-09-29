@@ -10,6 +10,7 @@ import { captureOAuthAccountSelection, getAccountSet, saveCredential, setActiveA
 import { clearAccountQuotaCache, setCachedProviderAccountQuotaForTests } from "../../../src/providers/quota";
 import { clearResponseStateForTests } from "../../../src/responses/state";
 import { handleResponses } from "../../../src/server/responses";
+import { runAnthropicWebSearch } from "../../../src/web-search/anthropic-executor";
 import type { OcxConfig, OcxProviderConfig } from "../../../src/types";
 
 const originalHome = process.env.OPENCODEX_HOME;
@@ -107,6 +108,35 @@ test("sidecar helpers use the routed account and refuse an empty strict route", 
   cfg.anthropicAccountPool!.routes![0]!.accounts = ["removed-account"];
   await expect(getAnthropicSidecarAccessToken("anthropic", "claude-sonnet-4-5", cfg))
     .rejects.toThrow("No permitted Anthropic account");
+});
+
+test("a web-search sidecar send carries the routed account's credential", async () => {
+  const ids = await seed();
+  const cfg = config(ids, () => answer());
+  cfg.anthropicAccountPool!.routes![0]!.accounts = [ids[1]!];
+
+  let sentAuth = "";
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    sentAuth = new Headers(init?.headers).get("authorization") ?? "";
+    const frame = {
+      type: "content_block_delta",
+      index: 0,
+      delta: { type: "text_delta", text: "done" },
+    };
+    return new Response(`event: content_block_delta\ndata: ${JSON.stringify(frame)}\n\n`, { status: 200 });
+  }) as typeof fetch;
+
+  const out = await runAnthropicWebSearch(
+    "bun release",
+    "anthropic",
+    cfg.providers.anthropic as OcxProviderConfig,
+    { model: "claude-sonnet-4-5", reasoning: "low", timeoutMs: 5_000 },
+    undefined,
+    cfg,
+  );
+  expect(out.error).toBeUndefined();
+  expect(out.text).toBe("done");
+  expect(sentAuth).toBe("Bearer synthetic-access-1");
 });
 
 // An operator may name a route after an account ID; the data-plane client must never see it.
