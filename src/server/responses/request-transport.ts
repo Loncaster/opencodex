@@ -655,11 +655,18 @@ export async function prepareResponsesTransport(
         if (safetyAlternateId && admitted.accountId !== safetyAlternateId)
           return formatErrorResponse(409, "conflict_error", "OAuth account selection changed; retry the request");
         if (kiroLoadEnabled) {
+          const transportSignal = options.abortSignal ?? req.signal;
           const lease = await acquireAccountLease("kiro", admitted.accountId, {
-            maxConcurrentPerAccount: kiroCap, waitMs: KIRO_ACCOUNT_WAIT_MS, signal: options.abortSignal ?? req.signal,
+            maxConcurrentPerAccount: kiroCap, waitMs: KIRO_ACCOUNT_WAIT_MS, signal: transportSignal,
           });
-          if (!lease) return (options.abortSignal ?? req.signal).aborted
+          if (!lease) return transportSignal.aborted
             ? clientCancelledResponse() : capacityResponse();
+          // The lease may be granted between the holder's cleanup and this install;
+          // re-check cancellation before the holder can no longer reach it.
+          if (options.accountLoad?.cancelled || transportSignal.aborted) {
+            lease.release();
+            return clientCancelledResponse();
+          }
           if (options.accountLoad) options.accountLoad.lease = lease;
           else lease.release();
         }

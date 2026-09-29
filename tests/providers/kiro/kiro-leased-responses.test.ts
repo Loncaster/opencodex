@@ -422,3 +422,22 @@ test("aborting initial capacity wait returns the client cancellation response", 
   expect(response.status).toBe(499);
   expect(accountInFlight("kiro", a!)).toBe(1);
 });
+
+test("a lease granted as the request aborts is released instead of sending", async () => {
+  const [a] = await seed();
+  const block = (await acquireAccountLease("kiro", a!))!;
+  let sends = 0;
+  globalThis.fetch = async () => { sends += 1; return answer(); };
+  const controller = new AbortController();
+  const pending = handleResponses(request(controller.signal), config(),
+    { model: "claude-sonnet-4.5", provider: "kiro" }, { abortSignal: controller.signal });
+  // Let initial admission reach its capacity wait, then grant it and abort before the
+  // grant continuation installs the lease on the holder.
+  await new Promise(resolve => setTimeout(resolve, 30));
+  block.release();
+  controller.abort();
+  const response = await pending;
+  expect(response.status).toBe(499);
+  expect(sends).toBe(0);
+  expect(accountInFlight("kiro", a!)).toBe(0);
+});
