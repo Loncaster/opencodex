@@ -72,7 +72,7 @@ symbols for compatibility, but new lifecycle-only callers import the process-sta
 
 Replacing config and process-state writes use `src/config/atomic-write.ts`. The leaf preserves the shared
 process-wide temp sequence, symlink target resolution, no-follow directory-entry replacement for
-externally writable integration directories, real-home test guard, owner manifest,
+externally writable integration directories (including owner-registry pointers published only after their locator directory is hardened to owner-only permissions), real-home test guard, owner manifest,
 Windows ACL hardening, scrub-before-unlink failure path, and explicit residual-temp errors. A caller
 must not replace it with a local temp-and-rename shortcut. Publication failures in
 `src/config/persist-unlocked.ts` and `src/config/live-reconcile.ts` follow the [publication-aware rollback contract](gui-and-management-api.md#durable-provider-patch).
