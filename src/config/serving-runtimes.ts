@@ -33,7 +33,8 @@ import { assertNotRealHomeUnderTest } from "../lib/test-home-guard";
 import { atomicWriteFile } from "./atomic-write";
 import { getConfigDir } from "./paths";
 import { ConfigMutationLockError, withConfigMutationLockSync } from "./mutation-lock";
-import { SERVICE_MANAGED_ENV } from "../service/state";
+import { inspectServiceManagerInstallation } from "../service-manager-probe";
+import { compareServicePathToInstall, currentServiceHomes, SERVICE_MANAGED_ENV } from "../service/state";
 import { WINDOWS_WRAPPER_PROTOCOL_ENV } from "../service/windows-wrapper-exit";
 
 export function servingRuntimesPath(dir: string = getConfigDir()): string {
@@ -258,6 +259,8 @@ export interface DeferToNewerRuntimeDeps extends NewerServingRuntimeDeps {
   readonly log?: (line: string) => void;
   /** Environment the service manager gave this child; decides its stay-out exit code. */
   readonly env?: NodeJS.ProcessEnv;
+  /** Test seam for the manager-definition provenance check at the pre-probe gate. */
+  readonly installedServiceOwnsCurrentHome?: () => boolean;
 }
 
 interface DelegatedExit { readonly exitCode: number; readonly ready: boolean }
@@ -397,7 +400,24 @@ export async function deferServiceChildToNewerRuntime(options: {
   readonly deps?: DeferToNewerRuntimeDeps;
 }): Promise<number | null> {
   if (options.sibling || !isManagedServiceEnvironment(options.env) || options.env[DELEGATED_ONCE_ENV] === "1") return null;
+  const installedServiceOwnsCurrentHome = options.deps?.installedServiceOwnsCurrentHome
+    ?? serviceManagerOwnsCurrentHome;
+  // Bun may populate the live environment from a project-controlled dotenv file. Markers
+  // therefore identify the service protocol but are not authority to execute census paths:
+  // require a live manager registration whose generated definition names this home first.
+  if (!installedServiceOwnsCurrentHome()) return null;
   return deferToNewerServiceRuntime(options.selfVersion, options.selfCommand, options.port, { env: options.env, ...options.deps });
+}
+
+function serviceManagerOwnsCurrentHome(): boolean {
+  const current = currentServiceHomes();
+  const installation = inspectServiceManagerInstallation({ configDir: current.opencodexHome });
+  if (installation.kind !== "present") return false;
+  return installation.claims.some(claim => claim.registration === "present"
+    && (claim.homes.codexHome === null
+      || compareServicePathToInstall(claim.homes.codexHome, current.codexHome) === "same")
+    && (claim.homes.opencodexHome === null
+      || compareServicePathToInstall(claim.homes.opencodexHome, current.opencodexHome) === "same"));
 }
 
 /**

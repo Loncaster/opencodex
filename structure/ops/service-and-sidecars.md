@@ -32,7 +32,10 @@ wrapper-protocol marker. Legacy WinSW definitions carrying only `OCX_SERVICE=1` 
 delegate until `ocx service repair` rewrites the XML. The census update uses the shared
 cross-process config mutation lock; recorded paths must resolve to files owned
 by the current user without group/world write permission on POSIX. Candidate
-probes are newest-recorded first, capped at four three-second attempts; a failed probe
+execution additionally requires a live service-manager registration whose generated
+definition names the current homes; environment markers alone never authorize a census
+probe because Bun can load them from a project dotenv file. Candidate probes are
+newest-recorded first, capped at four three-second attempts; a failed probe
 falls through within that cap, and a failed launch or any pre-bind child exit (0 and the
 stay-out code included) leaves this install serving: its own lease-held bind fence then
 re-applies every stay-out condition, so a deliberate stand-down is still honored. A one-hop

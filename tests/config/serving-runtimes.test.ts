@@ -463,6 +463,7 @@ describe("deferServiceChildToNewerRuntime", () => {
     const deps = {
       dir,
       exists: () => true,
+      installedServiceOwnsCurrentHome: () => true,
       run: () => ({ status: 0, stdout: "opencodex 2.68.0", stderr: "" }),
       runInherited: async () => { throw new Error("must not run"); },
       log: () => {},
@@ -472,6 +473,18 @@ describe("deferServiceChildToNewerRuntime", () => {
     expect(await deferServiceChildToNewerRuntime({ ...base, sibling: false, env: {} })).toBeNull();
     expect(await deferServiceChildToNewerRuntime({ ...base, sibling: false, env: { OCX_SERVICE: "1" } })).toBeNull();
     expect(await deferServiceChildToNewerRuntime({ ...base, sibling: false, env: { OCX_SERVICE_MANAGED: "1", OCX_DELEGATED_ONCE: "1" } })).toBeNull();
+    let probes = 0;
+    expect(await deferServiceChildToNewerRuntime({
+      ...base,
+      sibling: false,
+      env: { OCX_SERVICE_MANAGED: "1" },
+      deps: {
+        ...deps,
+        installedServiceOwnsCurrentHome: () => false,
+        run: () => { probes += 1; return { status: 0, stdout: "opencodex 2.68.0", stderr: "" }; },
+      },
+    })).toBeNull();
+    expect(probes).toBe(0);
     // The Task Scheduler wrapper's own environment, read back from the batch it generates.
     const batch = buildWindowsServiceScript({ bun: "C:\\ocx\\bun.exe", bunRuntimeSource: "bundled", cli: null }, 10100, []);
     const wrapperEnv = Object.fromEntries([...batch.matchAll(/^set "(OCX_[A-Z_]+)=([^"]*)"$/gm)].map(m => [m[1]!, m[2]!]));
@@ -517,6 +530,7 @@ describe("deferServiceChildToNewerRuntime", () => {
       deps: {
         dir,
         exists: () => true,
+        installedServiceOwnsCurrentHome: () => true,
         run: () => ({ status: 0, stdout: "opencodex 2.68.0", stderr: "" }),
         runInherited: async (command, args) => {
           expect(command).toEqual([newer]);
