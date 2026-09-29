@@ -11,6 +11,7 @@ import { captureExplicitOpenAiCallerAuth } from "../../providers/openai-sidecar"
 import { captureCallerDirectAuth } from "../../providers/caller-authorization";
 import { resolvePolicyProfileId } from "../../routing/profile";
 import { parseSyntheticRowId } from "../fast-row";
+import { routeModel } from "../../router";
 
 type CoreHandler = typeof handleResponsesCore;
 type CoreOptions = Parameters<CoreHandler>[3];
@@ -21,6 +22,21 @@ export interface PolicyFallbackDeps {
 
 function candidateKey(candidate: Pick<RouteCandidateTrace, "provider" | "model">): string {
   return `${candidate.provider}\u0000${candidate.model}`;
+}
+
+function staysWithinPolicyAfterRedirect(
+  config: OcxConfig,
+  trace: RouteDecisionTraceV1,
+  candidate: RouteCandidateTrace,
+): boolean {
+  try {
+    const routed = routeModel(config, `${candidate.provider}/${candidate.model}`);
+    return routed.routeReason !== "blocked-model-redirect" || trace.candidates.some(allowed =>
+      allowed.eligible && allowed.provider === routed.providerName && allowed.model === routed.modelId
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -185,7 +201,8 @@ export async function handleResponsesWithPolicyFallback(
 
   while (!storedPool401ReplayDispatched && await shouldHopPolicyCandidate(response, req.signal)) {
     if (req.signal.aborted) return response;
-    const next = rankPolicyFallbackCandidates(initialTrace, tried)[0];
+    const next = rankPolicyFallbackCandidates(initialTrace, tried)
+      .find(candidate => staysWithinPolicyAfterRedirect(config, initialTrace, candidate));
     if (!next) return response;
     tried.add(candidateKey(next));
 

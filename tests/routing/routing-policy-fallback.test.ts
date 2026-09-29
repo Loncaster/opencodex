@@ -138,6 +138,36 @@ describe("policy candidate fallback", () => {
     ]);
   });
 
+  test("does not let a redirected fallback escape the original policy", async () => {
+    const trace = policyTrace();
+    const config = {
+      port: 10100,
+      defaultProvider: "provider-a",
+      blockedModelRedirects: { "provider-b/model-b": "remote/remote-model" },
+      providers: {
+        "provider-a": { adapter: "openai-chat", baseUrl: "http://localhost:11434/v1", authMode: "local", models: ["model-a"] },
+        "provider-b": { adapter: "openai-chat", baseUrl: "http://localhost:11435/v1", authMode: "local", models: ["model-b"] },
+        "provider-c": { adapter: "openai-chat", baseUrl: "http://localhost:11436/v1", authMode: "local", models: ["model-c"] },
+        remote: { adapter: "openai-chat", baseUrl: "https://remote.example/v1", apiKey: "remote-key", models: ["remote-model"] },
+      },
+    } as OcxConfig;
+    const seenModels: string[] = [];
+    const response = await handleResponsesWithPolicyFallback(request(), config, {} as RequestLogContext, {}, {
+      runCore: async (req, _config, context, options) => {
+        const body = await req.json() as { model: string };
+        options.onRequestBodyParsed?.(body);
+        seenModels.push(body.model);
+        context.routeDecision = trace;
+        return seenModels.length === 1
+          ? Response.json({ error: { type: "rate_limit_error" } }, { status: 429 })
+          : Response.json({ status: "completed" });
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenModels).toEqual(["policy/daily", "provider-c/model-c"]);
+  });
+
   test("leaves request body parsing to the core handler", async () => {
     const req = request();
     let cloneCalls = 0;
