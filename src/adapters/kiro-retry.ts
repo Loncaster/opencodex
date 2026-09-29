@@ -165,6 +165,7 @@ async function fetchWithResetRecovery(
   notePhysicalSend: (reset: boolean) => void,
 ): Promise<Response> {
   let lastError: unknown;
+  let destination = url;
   for (let attempt = 0; attempt < RESET_ATTEMPTS; attempt++) {
     if (ctx.abortSignal?.aborted) throw abortError(ctx.abortSignal);
     const executor = (ctx.executor ?? globalThis.fetch) as typeof globalThis.fetch & {
@@ -177,18 +178,19 @@ async function fetchWithResetRecovery(
       // Every physical send is admitted, not just the adapter entry. Kiro nests a throttle loop
       // over this ladder and can run the ladder twice per throttle round, so counting one entry
       // as one send hid up to eighteen upstream requests from the per-request cap (#4546).
-      const decision = ctx.sendBudget?.reserveDispatch({ sendClass: "transient", targetKey: url });
+      const decision = ctx.sendBudget?.reserveDispatch({ sendClass: "transient", targetKey: destination });
       if (decision && (!decision.allowed || !decision.permit.use())) {
-        throw new SendBudgetExhaustedError(url);
+        throw new SendBudgetExhaustedError(destination);
       }
       // Reported after admission and before dispatch, so a refused send is never counted and an
       // admitted one is counted exactly once whichever way the fetch below settles.
       notePhysicalSend(attempt > 0);
+      const requestUrl = request.url;
       try {
         const headers = new Headers(request.headers);
         const recovered = attempt > 0;
         if (recovered) headers.set("connection", "close");
-        return await sendTrackingRequestSlot(slot, () => fetchWithAttemptDeadline(url, {
+        return await sendTrackingRequestSlot(slot, () => fetchWithAttemptDeadline(destination, {
           method: request.method,
           headers,
           body: request.body,
@@ -208,6 +210,7 @@ async function fetchWithResetRecovery(
       } catch (error) {
         if (ctx.abortSignal?.aborted || !isConnectionResetError(error) || attempt === RESET_ATTEMPTS - 1) throw error;
         lastError = error;
+        if (request.url !== requestUrl) destination = request.url;
         await sleepWithAbort(retryBackoffDelayMs(attempt, {
           baseDelayMs: RESET_RETRY_BASE_MS,
           maxDelayMs: RESET_RETRY_MAX_MS,

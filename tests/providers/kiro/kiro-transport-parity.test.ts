@@ -156,6 +156,32 @@ test("empty response URL uses the request URL after dispatch override rebuild", 
   expect(urls).toEqual([request.url, "https://q.eu-west-1.amazonaws.com/"]);
 });
 
+test("reset recovery keeps rebuilt credentials bound to their destination", async () => {
+  const sends: Array<{ url: string; bearer: string; body: string }> = [];
+  const mutable = { ...request };
+  const executor = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (sends.length === 0) {
+      mutable.url = "https://replacement.invalid/";
+      mutable.headers = { authorization: "Bearer replacement" };
+      mutable.body = "replacement-body";
+      sends.push({ url: mutable.url, bearer: "Bearer replacement", body: mutable.body });
+    } else {
+      sends.push({
+        url: String(input),
+        bearer: new Headers(init?.headers).get("authorization") ?? "",
+        body: String(init?.body),
+      });
+    }
+    if (sends.length === 1) throw Object.assign(new Error("reset"), { code: "ECONNRESET" });
+    return new Response("ok");
+  }) as typeof fetch;
+  await fetchKiroWithRetry(mutable, { executor, timeoutMs: 5_000 });
+  expect(sends).toEqual([
+    { url: mutable.url, bearer: "Bearer replacement", body: "replacement-body" },
+    { url: mutable.url, bearer: "Bearer replacement", body: "replacement-body" },
+  ]);
+});
+
 test("noncanonical dispatched response URL blocks gateway rotation", async () => {
   const urls: string[] = [];
   const executor = (async (input: RequestInfo | URL) => { urls.push(String(input)); return responseWithUrl(503, "https://custom.invalid/"); }) as typeof fetch;
