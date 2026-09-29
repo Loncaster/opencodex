@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { acquireOwnedSpendHome } from "../../helpers/owned-spend-home";
 import { removeTreeWithRetry } from "../../helpers/remove-tree";
-import { clearAnthropicAccountPoolState, bindAnthropicSessionAffinity, getAnthropicPoolAccessSnapshot, getAnthropicPoolRetryAfterSeconds, promoteAnthropicActiveAccount, resolveAnthropicAccountForSession, rotateAnthropicAccountOn429 } from "../../../src/oauth/anthropic-routing";
+import { clearAnthropicAccountPoolState, bindAnthropicSessionAffinity, getAnthropicPoolAccessSnapshot, getAnthropicPoolRetryAfterSeconds, getAnthropicSidecarAccessToken, promoteAnthropicActiveAccount, resolveAnthropicAccountForSession, rotateAnthropicAccountOn429 } from "../../../src/oauth/anthropic-routing";
 import { parseAnthropicModelRoutes, resolveAnthropicModelRoute } from "../../../src/oauth/anthropic-model-routes";
 import { captureOAuthAccountSelection, getAccountSet, saveCredential, setActiveAccount } from "../../../src/oauth/store";
 import { clearAccountQuotaCache, setCachedProviderAccountQuotaForTests } from "../../../src/providers/quota";
@@ -95,6 +95,18 @@ test("matched route excludes active outsider before an upstream send", async () 
   expect(sends).toHaveLength(1);
   expect(sends[0]).not.toContain("synthetic-access-0");
   expect(["synthetic-access-1", "synthetic-access-2"].some(token => sends[0]!.includes(token))).toBe(true);
+});
+
+test("sidecar helpers use the routed account and refuse an empty strict route", async () => {
+  const ids = await seed();
+  const cfg = config(ids, () => answer());
+  cfg.anthropicAccountPool!.routes![0]!.accounts = [ids[1]!];
+  expect(await getAnthropicSidecarAccessToken("anthropic", "claude-sonnet-4-5", cfg))
+    .toBe("synthetic-access-1");
+
+  cfg.anthropicAccountPool!.routes![0]!.accounts = ["removed-account"];
+  await expect(getAnthropicSidecarAccessToken("anthropic", "claude-sonnet-4-5", cfg))
+    .rejects.toThrow("No permitted Anthropic account");
 });
 
 // An operator may name a route after an account ID; the data-plane client must never see it.

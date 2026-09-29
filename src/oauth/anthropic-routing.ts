@@ -33,7 +33,7 @@ import {
 import type { OcxAccountPoolQuotaWindow, OcxAccountPoolRotationStrategy, OcxConfig } from "../types";
 import { sweepExpiredOnWrite } from "../lib/state-store-sweeper";
 import { retainedUtf8Bytes } from "../lib/admission";
-import { routeCandidates, type AnthropicRouteDecision } from "./anthropic-model-routes";
+import { resolveAnthropicModelRoute, routeCandidates, type AnthropicRouteDecision } from "./anthropic-model-routes";
 
 /**
  * The read side of a `Headers` object, so a caller can pass the live upstream response's
@@ -879,6 +879,23 @@ export async function getAnthropicPoolAccessSnapshot(accountId: string): Promise
     throw new Error("Anthropic pool credential changed during account selection");
   }
   return { provider: PROVIDER, accountId, accessToken, generation: credentialGeneration(row.credential) };
+}
+
+/** Resolve a direct Anthropic helper send through the same model route as primary traffic. */
+export async function getAnthropicSidecarAccessToken(
+  providerName: string,
+  model: string,
+  config?: OcxConfig,
+): Promise<string> {
+  if (providerName !== PROVIDER || !config || !isAnthropicAccountPoolEnabled(config)) {
+    const { getValidAccessToken } = await import("./index");
+    return getValidAccessToken(providerName);
+  }
+  const route = resolveAnthropicModelRoute(config, model);
+  if (route.error) throw new Error("Invalid Anthropic model route configuration");
+  const selection = resolveAnthropicAccountForSession(null, config, Date.now(), route.decision);
+  if (!selection.accountId) throw new Error("No permitted Anthropic account is available for this model");
+  return (await getAnthropicPoolAccessSnapshot(selection.accountId)).accessToken;
 }
 
 /**
