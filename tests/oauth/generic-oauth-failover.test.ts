@@ -23,7 +23,12 @@ import { clearAccountQuotaCache, setCachedProviderAccountQuotaForTests } from ".
 import { subscribeAccountSelections } from "../../src/lib/account-selection-events";
 import { resolveCopilotApiBaseUrl } from "../../src/oauth/github-copilot";
 import { resolveProviderTransport } from "../../src/providers/xai-transport";
-import type { OcxConfig, OcxProviderConfig } from "../../src/types";
+import { bindRouteReasoningReplayScope } from "../../src/server/responses/core-replay";
+import {
+  clearReasoningReplayCacheForTests,
+  commitReasoningReplayServingIdentity,
+} from "../../src/responses/reasoning-replay-cache";
+import type { OcxConfig, OcxParsedRequest, OcxProviderConfig } from "../../src/types";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
 import { repoPath } from "../helpers/repo-root";
 
@@ -467,6 +472,47 @@ describe("sidecar on429 wiring", () => {
     expect(arm.slice(rebound, replayed)).toContain(
       "oauthCredentialSnapshot: transportState.replayOAuthCredentialSnapshot",
     );
+  });
+
+  test("a failover rebind discards the previous account's continuation scope", () => {
+    // The source-order test above proves the arm binds before replay; this one proves the bind
+    // itself retires the old account's replay state. The arm hands the NEW snapshot to
+    // bindRouteReasoningReplayScope, so a continuation served under account-old and retried under
+    // account-new must strip the old store's encrypted blobs and foreign reasoning item ids.
+    clearReasoningReplayCacheForTests();
+    const parsed = {
+      modelId: "claude-sonnet-4.5",
+      context: { messages: [] },
+      stream: false,
+      options: {},
+      _reasoningReplayScope: { clientThreadId: "thread-failover-rebind" },
+    } as unknown as OcxParsedRequest;
+    const provider = {
+      adapter: "kiro",
+      baseUrl: "https://q.us-east-1.amazonaws.com",
+      authMode: "oauth",
+    } as unknown as OcxProviderConfig;
+    const bind = (accountId: string) =>
+      bindRouteReasoningReplayScope({
+        parsed,
+        providerName: "kiro",
+        provider,
+        adapterName: "kiro",
+        oauthCredentialSnapshot: { accountId, generation: "1" },
+      });
+
+    bind("account-old");
+    commitReasoningReplayServingIdentity(parsed._reasoningReplayScope);
+    const servedIdentity = parsed._reasoningReplayScope?.current?.credentialIdentity;
+    expect(servedIdentity).toBeTruthy();
+    expect(parsed._stripReasoningEncryptedContent).toBeUndefined();
+
+    bind("account-new");
+
+    expect(parsed._reasoningReplayScope?.current?.credentialIdentity).not.toBe(servedIdentity);
+    expect(parsed._stripReasoningEncryptedContent).toBe(true);
+    expect(parsed._dropForeignReasoningItemIds).toBe(true);
+    clearReasoningReplayCacheForTests();
   });
 
   test("every 429 recovery loop carries all three rotators (#3495 follow-up)", () => {
