@@ -169,6 +169,34 @@ test("an abandoned response body releases its lease when the request aborts", as
   await response.body?.cancel();
 });
 
+test("cancellation during Kiro credential recovery cannot install a replacement lease", async () => {
+  const [id] = await seed();
+  const controller = new AbortController();
+  let refreshStarted!: () => void;
+  let finishRefresh!: () => void;
+  const started = new Promise<void>(resolve => { refreshStarted = resolve; });
+  const refreshGate = new Promise<void>(resolve => { finishRefresh = resolve; });
+  globalThis.fetch = (async input => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (url.endsWith("/refreshToken")) {
+      refreshStarted();
+      await refreshGate;
+      return Response.json({ accessToken: "refreshed-access", refreshToken: "load-refresh-0", expiresIn: 3600 });
+    }
+    return new Response("expired", { status: 401 });
+  }) as typeof fetch;
+
+  const pending = handleResponses(request(controller.signal), config(),
+    { model: "claude-sonnet-4.5", provider: "kiro" }, { abortSignal: controller.signal });
+  await started;
+  controller.abort();
+  expect(accountInFlight("kiro", id!)).toBe(0);
+  finishRefresh();
+  const response = await pending;
+  expect(response.status).toBe(401);
+  expect(accountInFlight("kiro", id!)).toBe(0);
+});
+
 test("a reactive rotation onto a full account leaves the store selection and request state unchanged", async () => {
   const [a, b] = await seed(2);
   held.push((await acquireAccountLease("kiro", b!))!);

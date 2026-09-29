@@ -210,8 +210,11 @@ export async function prepareResponsesTransport(
     const admitted = await commitResolvedOAuthSelection(candidate);
     if (!admitted) throw new Error("OAuth selection changed during credential recovery");
     if (kiroLoadEnabled && options.accountLoad?.lease?.accountId !== admitted.accountId) {
-      const replayLease = await acquireAccountLease("kiro", admitted.accountId, { maxConcurrentPerAccount: kiroCap });
-      if (!replayLease || !options.accountLoad) {
+      const signal = options.abortSignal ?? req.signal;
+      const replayLease = await acquireAccountLease("kiro", admitted.accountId, {
+        maxConcurrentPerAccount: kiroCap, signal,
+      });
+      if (!replayLease || !options.accountLoad || options.accountLoad.cancelled || signal.aborted) {
         replayLease?.release();
         throw new Error("Kiro replay account capacity is full");
       }
@@ -256,16 +259,20 @@ export async function prepareResponsesTransport(
     retryParsed: OcxParsedRequest = parsed,
   ): Promise<OAuthAccessSnapshot | null> => {
     if (route.provider.googleMode === "cloud-code-assist" && !snapshot.projectId) return null;
+    const signal = options.abortSignal ?? req.signal;
     let speculative = kiroLoadEnabled && options.accountLoad?.lease?.accountId !== snapshot.accountId
-      ? await acquireAccountLease("kiro", snapshot.accountId, { maxConcurrentPerAccount: kiroCap }) : null;
+      ? await acquireAccountLease("kiro", snapshot.accountId, { maxConcurrentPerAccount: kiroCap, signal }) : null;
+    if (speculative && (options.accountLoad?.cancelled || signal.aborted)) { speculative.release(); return null; }
     if (kiroLoadEnabled && options.accountLoad?.lease?.accountId !== snapshot.accountId && !speculative) return null;
     let committed: OAuthAccessSnapshot | null;
     try { committed = await commitResolvedOAuthSelection(snapshot); }
     catch (error) { speculative?.release(); throw error; }
     if (!committed) { speculative?.release(); return null; }
+    if (speculative && (options.accountLoad?.cancelled || signal.aborted)) { speculative.release(); return null; }
     if (kiroLoadEnabled && committed.accountId !== (speculative?.accountId ?? options.accountLoad?.lease?.accountId)) {
       speculative?.release();
-      speculative = await acquireAccountLease("kiro", committed.accountId, { maxConcurrentPerAccount: kiroCap });
+      speculative = await acquireAccountLease("kiro", committed.accountId, { maxConcurrentPerAccount: kiroCap, signal });
+      if (speculative && (options.accountLoad?.cancelled || signal.aborted)) { speculative.release(); return null; }
       if (!speculative) return null;
     }
     if (speculative && options.accountLoad) {
