@@ -615,6 +615,7 @@ export async function prepareResponsesRequest(
       if (parsed._compactionRequest === true) parsed._portableCompaction = true;
     }
     logCtx.routeDecision = route.routeDecision;
+    logCtx.policyEligibility = route.policyEligibility;
   } catch (err) {
     if (err instanceof AdmissionModelDeniedError) return admissionModelDeniedResponse(err);
     if (err instanceof NoAvailableComboTargetsError) {
@@ -827,6 +828,7 @@ export async function prepareResponsesRequest(
         );
         credentialDomainWasRewritten = true;
         logCtx.routeDecision = route.routeDecision;
+        logCtx.policyEligibility = route.policyEligibility;
       } catch (err) {
         if (err instanceof AdmissionModelDeniedError) return admissionModelDeniedResponse(err);
         if (err instanceof NoAvailableComboTargetsError) {
@@ -1038,6 +1040,7 @@ export async function prepareResponsesRequest(
               );
               credentialDomainWasRewritten = true;
               logCtx.routeDecision = route.routeDecision;
+              logCtx.policyEligibility = route.policyEligibility;
             } catch (err) {
               if (err instanceof AdmissionModelDeniedError) return admissionModelDeniedResponse(err);
               if (err instanceof NoAvailableComboTargetsError) {

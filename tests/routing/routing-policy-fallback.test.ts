@@ -145,9 +145,9 @@ describe("policy candidate fallback", () => {
       defaultProvider: "provider-a",
       blockedModelRedirects: { "provider-b/model-b": "remote/remote-model" },
       providers: {
-        "provider-a": { adapter: "openai-chat", baseUrl: "http://localhost:11434/v1", authMode: "local", models: ["model-a"] },
-        "provider-b": { adapter: "openai-chat", baseUrl: "http://localhost:11435/v1", authMode: "local", models: ["model-b"] },
-        "provider-c": { adapter: "openai-chat", baseUrl: "http://localhost:11436/v1", authMode: "local", models: ["model-c"] },
+        "provider-a": { adapter: "openai-chat", baseUrl: "http://localhost:11434/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-a"] },
+        "provider-b": { adapter: "openai-chat", baseUrl: "http://localhost:11435/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-b"] },
+        "provider-c": { adapter: "openai-chat", baseUrl: "http://localhost:11436/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-c"] },
         remote: { adapter: "openai-chat", baseUrl: "https://remote.example/v1", apiKey: "remote-key", models: ["remote-model"] },
       },
     } as OcxConfig;
@@ -166,6 +166,81 @@ describe("policy candidate fallback", () => {
 
     expect(response.status).toBe(200);
     expect(seenModels).toEqual(["policy/daily", "provider-c/model-c"]);
+  });
+
+  test("a fallback candidate with an unresolvable redirect is skipped instead of ending the fallback", async () => {
+    const trace = policyTrace();
+    const config = {
+      port: 10100,
+      defaultProvider: "provider-a",
+      blockedModelRedirects: {
+        "provider-b/model-b": "remote/remote-model",
+        "remote/remote-model": "provider-b/model-b",
+      },
+      providers: {
+        "provider-a": { adapter: "openai-chat", baseUrl: "http://localhost:11434/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-a"] },
+        "provider-b": { adapter: "openai-chat", baseUrl: "http://localhost:11435/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-b"] },
+        "provider-c": { adapter: "openai-chat", baseUrl: "http://localhost:11436/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-c"] },
+        remote: { adapter: "openai-chat", baseUrl: "https://remote.example/v1", apiKey: "remote-key", models: ["remote-model"] },
+      },
+    } as OcxConfig;
+    const seenModels: string[] = [];
+    const response = await handleResponsesWithPolicyFallback(request(), config, {} as RequestLogContext, {}, {
+      runCore: async (req, _config, context, options) => {
+        const body = await req.json() as { model: string };
+        options.onRequestBodyParsed?.(body);
+        seenModels.push(body.model);
+        context.routeDecision = trace;
+        return seenModels.length === 1
+          ? Response.json({ error: { type: "rate_limit_error" } }, { status: 429 })
+          : Response.json({ status: "completed" });
+      },
+    });
+
+    // The cyclic redirect on provider-b cannot resolve, so it is skipped and the
+    // healthy eligible candidate still serves the request.
+    expect(response.status).toBe(200);
+    expect(seenModels).toEqual(["policy/daily", "provider-c/model-c"]);
+  });
+
+  test("a redirect into an eligible candidate truncated out of the trace still hops", async () => {
+    const trace = policyTrace();
+    const config = {
+      port: 10100,
+      defaultProvider: "provider-a",
+      blockedModelRedirects: { "provider-b/model-b": "remote/remote-model" },
+      providers: {
+        "provider-a": { adapter: "openai-chat", baseUrl: "http://localhost:11434/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-a"] },
+        "provider-b": { adapter: "openai-chat", baseUrl: "http://localhost:11435/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-b"] },
+        "provider-c": { adapter: "openai-chat", baseUrl: "http://localhost:11436/v1", authMode: "local", allowPrivateNetwork: true, models: ["model-c"] },
+        remote: { adapter: "openai-chat", baseUrl: "https://remote.example/v1", apiKey: "remote-key", models: ["remote-model"] },
+      },
+    } as OcxConfig;
+    // Full evaluation membership, as stored on RequestLogContext for traces whose
+    // bounded candidate list dropped eligible rows.
+    const log: RequestLogContext = {
+      policyEligibility: new Set([
+        "provider-a\u0000model-a",
+        "provider-b\u0000model-b",
+        "provider-c\u0000model-c",
+        "remote\u0000remote-model",
+      ]),
+    };
+    const seenModels: string[] = [];
+    const response = await handleResponsesWithPolicyFallback(request(), config, log, {}, {
+      runCore: async (req, _config, context, options) => {
+        const body = await req.json() as { model: string };
+        options.onRequestBodyParsed?.(body);
+        seenModels.push(body.model);
+        context.routeDecision = trace;
+        return seenModels.length === 1
+          ? Response.json({ error: { type: "rate_limit_error" } }, { status: 429 })
+          : Response.json({ status: "completed" });
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenModels).toEqual(["policy/daily", "provider-b/model-b"]);
   });
 
   test("leaves request body parsing to the core handler", async () => {

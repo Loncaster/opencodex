@@ -11,7 +11,7 @@ import { captureExplicitOpenAiCallerAuth } from "../../providers/openai-sidecar"
 import { captureCallerDirectAuth } from "../../providers/caller-authorization";
 import { resolvePolicyProfileId } from "../../routing/profile";
 import { parseSyntheticRowId } from "../fast-row";
-import { routeModel } from "../../router";
+import { previewRouteModel } from "../../router";
 
 type CoreHandler = typeof handleResponsesCore;
 type CoreOptions = Parameters<CoreHandler>[3];
@@ -26,21 +26,21 @@ function candidateKey(candidate: Pick<RouteCandidateTrace, "provider" | "model">
 
 function staysWithinPolicyAfterRedirect(
   config: OcxConfig,
-  trace: RouteDecisionTraceV1,
+  policyEligibility: ReadonlySet<string>,
   candidate: RouteCandidateTrace,
 ): boolean {
   // "blocked-model-redirect" can only arise from a configured redirect entry; without one the
   // fallback hop reproduces the candidate's ordinary route.
   if (Object.keys(config.blockedModelRedirects ?? {}).length === 0) return true;
   try {
-    const routed = routeModel(config, `${candidate.provider}/${candidate.model}`);
-    return routed.routeReason !== "blocked-model-redirect" || trace.candidates.some(allowed =>
-      allowed.eligible && allowed.provider === routed.providerName && allowed.model === routed.modelId
-    );
+    // previewRouteModel: eligibility probing must not write combo selection state.
+    const routed = previewRouteModel(config, `${candidate.provider}/${candidate.model}`);
+    return routed.routeReason !== "blocked-model-redirect"
+      || policyEligibility.has(`${routed.providerName}\u0000${routed.modelId}`);
   } catch {
-    // A route that fails to resolve cannot redirect anywhere; the retry itself surfaces the same
-    // routing failure through the normal attempt path.
-    return true;
+    // A route that fails to resolve (e.g. a redirect cycle) cannot succeed on retry; its terminal
+    // error is rarely hop-worthy, so keep the fallback alive for the next eligible candidate.
+    return false;
   }
 }
 
@@ -203,11 +203,16 @@ export async function handleResponsesWithPolicyFallback(
   const tried = new Set<string>([
     candidateKey({ provider: initialTrace.selected.provider, model: initialTrace.selected.model }),
   ]);
+  // Redirect eligibility needs the full evaluation membership, not the bounded trace list.
+  const policyEligibility: ReadonlySet<string> = logCtx.policyEligibility
+    ?? new Set(initialTrace.candidates
+      .filter(candidate => candidate.eligible)
+      .map(candidate => candidateKey(candidate)));
 
   while (!storedPool401ReplayDispatched && await shouldHopPolicyCandidate(response, req.signal)) {
     if (req.signal.aborted) return response;
     const next = rankPolicyFallbackCandidates(initialTrace, tried)
-      .find(candidate => staysWithinPolicyAfterRedirect(config, initialTrace, candidate));
+      .find(candidate => staysWithinPolicyAfterRedirect(config, policyEligibility, candidate));
     if (!next) return response;
     tried.add(candidateKey(next));
 
