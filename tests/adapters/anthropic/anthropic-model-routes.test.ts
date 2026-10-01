@@ -13,7 +13,9 @@ import { clearUpstreamHostHealth, getUpstreamHostHealth, upstreamHostHealthKey }
 import { providerRequestPacingStatus, resetProviderRequestPacingForTest, waitForProviderRequestSlot } from "../../../src/providers/request-pacing";
 import { clearAccountQuotaCache, setCachedProviderAccountQuotaForTests } from "../../../src/providers/quota";
 import { clearResponseStateForTests } from "../../../src/responses/state";
+import { parseRequest } from "../../../src/responses/parser";
 import { handleResponses } from "../../../src/server/responses";
+import { describeImagesInPlace, planVisionSidecar, resetVisionDescriptionCache } from "../../../src/vision";
 import { runAnthropicWebSearch } from "../../../src/web-search/anthropic-executor";
 import type { OcxConfig, OcxProviderConfig } from "../../../src/types";
 
@@ -355,6 +357,55 @@ test("a web-search sidecar send carries the routed account's credential", async 
   expect(out.error).toBeUndefined();
   expect(out.text).toBe("done");
   expect(sentAuth).toBe("Bearer synthetic-access-1");
+});
+
+test.each([false, true])("vision plan enforces its helper-model account route (empty strict route=%s)", async emptyRoute => {
+  const ids = await seed();
+  const cfg = config(ids, () => answer());
+  const mainModel = "text-only-model";
+  const helperModel = "claude-haiku-4-5";
+  cfg.providers.anthropic!.noVisionModels = [mainModel];
+  cfg.visionSidecar = { enabled: true, backend: "anthropic", model: helperModel, timeoutMs: 5_000 };
+  cfg.anthropicAccountPool!.routes = [
+    { name: "main", match: mainModel, accounts: [ids[0]!] },
+    { name: "vision-helper", match: helperModel, accounts: [emptyRoute ? "removed-account" : ids[1]!] },
+  ];
+  const parsed = parseRequest({
+    model: `anthropic/${mainModel}`,
+    input: [{ type: "message", role: "user", content: [
+      { type: "input_text", text: "Describe this synthetic image." },
+      { type: "input_image", image_url: "data:image/png;base64,aGVsbG8=" },
+    ] }],
+  });
+  const visionSends: Array<{ authorization: string | null; model: string }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    visionSends.push({ authorization: new Headers(init?.headers).get("authorization"),
+      model: (JSON.parse(String(init?.body)) as { model: string }).model });
+    expect(String(input)).toBe("https://anthropic-routes.test/v1/messages");
+    const frame = { type: "content_block_delta", index: 0,
+      delta: { type: "text_delta", text: "A synthetic routed vision description." } };
+    return new Response(`event: content_block_delta\ndata: ${JSON.stringify(frame)}\n\n`);
+  }) as typeof fetch;
+  resetVisionDescriptionCache();
+  try {
+    const plan = planVisionSidecar(cfg, cfg.providers.anthropic!, mainModel, parsed,
+      undefined, { providerName: "anthropic" });
+    expect(plan?.backend).toBe("anthropic");
+    await describeImagesInPlace(parsed, plan!, new Headers());
+    const content = JSON.stringify(parsed.context.messages);
+    if (emptyRoute) {
+      expect(visionSends).toEqual([]);
+      expect(content).toContain("anthropic vision sidecar auth failed");
+      expect(content).not.toContain("A synthetic routed vision description.");
+    } else {
+      expect(visionSends).toEqual([{ authorization: "Bearer synthetic-access-1", model: helperModel }]);
+      expect(content).toContain("A synthetic routed vision description.");
+      expect(content).not.toContain("could not be processed");
+    }
+    expect(sends).toEqual([]);
+  } finally {
+    resetVisionDescriptionCache();
+  }
 });
 
 // An operator may name a route after an account ID; the data-plane client must never see it.
