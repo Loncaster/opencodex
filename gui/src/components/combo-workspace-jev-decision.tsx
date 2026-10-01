@@ -73,17 +73,17 @@ export function ComboJevDecisionSection({
     () => jevDecisionModelOptions(models, providers, combos, combo),
     [models, providers, combos, combo],
   );
-  const [test, setTest] = useState<DecisionTestResult | null>(null);
+  // Each result remembers the selection it describes; a different selection shows no result.
+  const [probe, setProbe] = useState<{ key: string; result: DecisionTestResult } | null>(null);
   const testAbort = useRef<AbortController | null>(null);
   const selectionKey = `${method}\0${decisionProvider ?? ""}\0${decisionModel ?? ""}\0${decisionTimeoutMs ?? ""}`;
+  const test = probe?.key === selectionKey ? probe.result : null;
+  const modelListId = `${idPrefix}-decision-model-options`;
 
-  // A result describes one selection; changing it (or unmounting) cancels and clears the probe.
-  useEffect(() => {
-    setTest(null);
-    return () => {
-      testAbort.current?.abort();
-      testAbort.current = null;
-    };
+  // Changing the selection (or unmounting) cancels an in-flight probe for the old one.
+  useEffect(() => () => {
+    testAbort.current?.abort();
+    testAbort.current = null;
   }, [selectionKey]);
 
   const selectMethod = (next: JevDecisionMethod) => {
@@ -103,6 +103,8 @@ export function ComboJevDecisionSection({
     testAbort.current?.abort();
     const controller = new AbortController();
     testAbort.current = controller;
+    const key = selectionKey;
+    const setTest = (result: DecisionTestResult) => setProbe({ key, result });
     setTest({ state: "running" });
     try {
       const response = await fetch(`${apiBase ?? ""}/api/combos/decision-test`, {
@@ -208,7 +210,7 @@ export function ComboJevDecisionSection({
           <input
             id={`${idPrefix}-decision-model`}
             className="input mono"
-            list={`${idPrefix}-decision-model-options`}
+            list={modelListId}
             value={decisionModel ?? ""}
             maxLength={512}
             spellCheck={false}
@@ -218,7 +220,7 @@ export function ComboJevDecisionSection({
             aria-describedby={`${idPrefix}-decision-model-hint`}
             onChange={(e) => onChange({ decisionModel: e.target.value, decisionProvider: null })}
           />
-          <datalist id={`${idPrefix}-decision-model-options`}>
+          <datalist id={modelListId}>
             {modelRoutes.map(route => <option key={route} value={route} />)}
           </datalist>
           <p id={`${idPrefix}-decision-model-hint`} className="muted" style={{ fontSize: 12, margin: "8px 0 0", overflowWrap: "anywhere" }}>
