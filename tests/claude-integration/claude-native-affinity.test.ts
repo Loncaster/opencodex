@@ -129,7 +129,10 @@ describe("Claude final canonical native affinity after a Go preliminary pick", (
   test("native failure leaves policy-hop request headers free of synthesized identity", async () => {
     clearHealthHistoryCacheForTests();
     const cfg = config();
-    cfg.routingProfiles = { "native-hop": { candidates: [{ provider: "openai", model: "gpt-5.6-luna" }] } };
+    cfg.routingProfiles = { "native-hop": { candidates: [
+      { provider: "openai", model: "gpt-5.6-luna" },
+      { provider: "other", model: "m" },
+    ] } };
     const trace = { version: 1, decisionId: "native-hop", createdAt: Date.now(), requestedModel: "policy/native-hop",
       routeKind: "policy", profile: { id: "native-hop", revision: "1" }, requirements: [],
       candidates: [
