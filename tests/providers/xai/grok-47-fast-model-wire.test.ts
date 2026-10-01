@@ -20,6 +20,7 @@ import { removeTreeWithRetry } from "../../helpers/remove-tree";
 
 const LOGICAL_MODEL = "grok-4.7";
 const FAST_MODEL = "grok-4.7-build-fast";
+const SCOPED_KEY = "ocx_data_" + "a".repeat(40);
 const TOKEN_ENDPOINT = "https://auth.x.ai/oauth/token";
 const BACKUP_BASE_URL = "https://grok47-backup.test/v1";
 type Body = Record<string, unknown>;
@@ -212,6 +213,23 @@ describe("Grok 4.7 Fast serialized upstream model", () => {
     expect(fixture.sends[0]!.body.model).toBe(LOGICAL_MODEL);
     expect(Object.hasOwn(fixture.sends[0]!.body, "service_tier")).toBe(false);
     expect(json.model).toBe(LOGICAL_MODEL);
+  });
+
+  test("a scope for the logical model does not authorize the Fast wire destination", async () => {
+    const fixture = await launch(xaiConfig("oauth", { hostname: "0.0.0.0", apiKeys: [{
+      id: "scoped", name: "scoped", key: SCOPED_KEY, createdAt: "2026-09-30T00:00:00.000Z",
+      allowedModels: ["xai/grok-4.7"],
+    }] }));
+    const url = new URL("/v1/responses", fixture.server.url);
+    url.hostname = "127.0.0.1";
+    const response = await originalFetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${SCOPED_KEY}` },
+      body: JSON.stringify(responsesBody({ model: "xai/grok-4.7", service_tier: "priority" })),
+    });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { type: "model_not_allowed_for_key" } });
+    expect(fixture.sends).toHaveLength(0);
   });
 
   test("key-auth --fast keeps grok-4.7 and priority on api.x.ai", async () => {
