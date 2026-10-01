@@ -30,6 +30,7 @@ import { dirname, join, resolve } from "node:path";
 import { atomicWriteFileNoFollow } from "./atomic-write";
 import { getConfigDir } from "./paths";
 import { assertNotRealHomeUnderTest } from "../lib/test-home-guard";
+import { hardenSecretDir } from "../lib/windows-secret-acl";
 
 const REGISTRY_DIR_NAME = "ocx-homes";
 /**
@@ -91,6 +92,7 @@ export function registerOwnerRegistryHome(home: string): void {
     const registryStat = lstatSync(dir);
     if (!registryStat.isDirectory() || registryStat.isSymbolicLink()) return;
     chmodSync(dir, 0o700);
+    hardenSecretDir(dir, { required: true });
     atomicWriteFileNoFollow(
       registryEntryPath(dir, home),
       JSON.stringify({ home: resolve(home), v: 1 }) + "\n",
