@@ -78,6 +78,26 @@ for (const offline of [false, true]) describe(`systemd home decoding (${offline 
     expect(result.claims[0]?.homes.codexHome).toBe("/fixture/.codex");
   });
 
+  test("non-environment directives are skipped, including X- extensions", () => {
+    writeFileSync(unitPath, [
+      "[Unit]",
+      "Description=OpenCodex Proxy Server",
+      "After=network-online.target",
+      "",
+      "[Service]",
+      "Type=simple",
+      "X-Custom=ignored extension",
+      "# a comment",
+      "; another comment",
+      "ExecStart=\"/bin/sh\" -lc \"ocx start\"",
+      "Environment=OPENCODEX_HOME=/fixture/.opencodex",
+    ].join("\n"));
+    const result = inspectServiceManagerInstallation(probe());
+    expect(result.kind).toBe("present");
+    if (result.kind !== "present") return;
+    expect(result.claims[0]?.homes).toEqual({ codexHome: null, opencodexHome: "/fixture/.opencodex" });
+  });
+
   test.each([
     ["unknown escape", 'Environment="CODEX_HOME=/fixture/\\q"'],
     ["unsupported tab escape", 'Environment="CODEX_HOME=/fixture/\\t"'],
@@ -95,6 +115,16 @@ for (const offline of [false, true]) describe(`systemd home decoding (${offline 
     ["continued directive name", 'Environment\\\n="CODEX_HOME=/foreign"'],
     ["continued directive across comments", 'Environment\\\n# ignored\n; ignored\n="CODEX_HOME=/foreign"'],
     ["continuation consuming a home assignment", 'ExecStart=/fixture/bin/ocx \\\nEnvironment="CODEX_HOME=/fixture/.codex"'],
+    ["bare directive without =", 'Environment'],
+    ["environment-file directive", 'EnvironmentFile=/fixture/env.list'],
+    ["pass-environment directive", 'PassEnvironment=OPENCODEX_HOME'],
+    ["unset-environment directive", 'UnsetEnvironment=OPENCODEX_HOME'],
+    ["suffixed environment directive", 'EnvironmentOther="OPENCODEX_HOME=/foreign"'],
+    ["extension environment directive", 'X-Environment="OPENCODEX_HOME=/foreign"'],
+    ["escaped directive name", 'Environ\\x6dent="OPENCODEX_HOME=/foreign"'],
+    ["specifier directive name", 'Environmen%74="OPENCODEX_HOME=/foreign"'],
+    ["spaced directive name", 'Environ ment="OPENCODEX_HOME=/foreign"'],
+    ["include directive", '.include /fixture/extra.conf'],
   ])("%s makes the whole definition unknown despite another matching home", (_, malformed) => {
     const homes = { codexHome: "/fixture/.codex", opencodexHome: "/fixture/.opencodex" };
     const statePath = join(testHome, "service-state.json");

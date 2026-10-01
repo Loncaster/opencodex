@@ -23,17 +23,35 @@ function decodeQuoted(value: string): string | undefined {
   return decoded;
 }
 
-/** Missing homes are null; unsupported or ambiguous assignments invalidate the entire definition. */
+/**
+ * Missing homes are null; unsupported or ambiguous assignments invalidate the entire definition.
+ *
+ * A directive name is everything before the first `=`, stripped — systemd matches that
+ * name literally and case-sensitively, so only the exact `Environment` can carry the
+ * home assignments this parser decodes. Every other name must be a plain
+ * non-environment identifier to be skipped: `EnvironmentFile=`, `PassEnvironment=` and
+ * `UnsetEnvironment=` mutate the applied environment the same way, an escaped or
+ * malformed name cannot be proven inert, and a line ending in an odd number of
+ * backslashes continues into the next under systemd's parser rather than standing on
+ * its own — all of them invalidate the definition instead of passing over silently.
+ */
 export function parseSystemdUnitHomes(body: string): SystemdHomeParse {
   const homes: SystemdHomes = { codexHome: null, opencodexHome: null };
   for (const rawLine of body.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line || /^[#;]/.test(line)) continue;
+    if (!line || /^[#;\[]/.test(line)) continue;
     // systemd folds physical continuations before recognizing directive names. The writer never
     // emits them; accepting individual lines could hide an override or invent a home assignment.
     const trailingBackslashes = /\\+$/.exec(rawLine)?.[0].length ?? 0;
     if (trailingBackslashes % 2 === 1) return { kind: "invalid" };
-    if (!/^Environment(?:\s|=|$)/.test(line)) continue;
+    const separator = line.indexOf("=");
+    const lvalue = (separator === -1 ? line : line.slice(0, separator)).trim();
+    if (lvalue !== "Environment") {
+      if (!/^[A-Za-z][A-Za-z0-9_.\-]*$/.test(lvalue) || lvalue.includes("Environment")) {
+        return { kind: "invalid" };
+      }
+      continue;
+    }
     const directive = /^Environment\s*=\s*(.*)$/.exec(line);
     if (!directive) return { kind: "invalid" };
     const encoded = directive[1]!;

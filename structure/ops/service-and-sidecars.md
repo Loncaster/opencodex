@@ -85,6 +85,11 @@ specifiers, malformed quotes, resets and duplicate home assignments make the who
 unknown in both online and offline probes; they never become omitted homes for ownership comparison.
 Non-comment physical line continuations also make the definition unknown before directive matching;
 the generated format uses single physical lines, while systemd otherwise folds continuations first.
+Directive names are matched literally like systemd's parser: only an exact `Environment` is
+decoded, while env-bearing siblings (`EnvironmentFile=`, `PassEnvironment=`, `UnsetEnvironment=`),
+escaped or malformed directive names, and `.include` all invalidate the definition instead of
+being skipped, because a directive the parser ignored could still change the environment the
+unit applies.
 On Windows, the generated-wrapper check accepts package installs that invoke the source CLI.
 A standalone wrapper that invokes `start` directly must carry the generated protocol and runtime
 markers, one quoted `OCX_BUN` assignment, and no `OCX_CLI` assignment in either quoting form.
