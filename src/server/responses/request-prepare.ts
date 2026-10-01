@@ -96,6 +96,7 @@ import {
   resolveSubagentFallbackModelEligibility,
   canPassThroughEncryptedV2AgentTask,
   applyFinalRouteRequestNormalization,
+  previewXaiOauthWireModel,
 } from "./core-normalize";
 import {
   cachedDeniedCodexAccountIdsForModel,
@@ -513,7 +514,6 @@ export async function prepareResponsesRequest(
     // shadow-intercept target and both subagent-fallback re-routes. Checking
     // the key's scope at this one point is what stops a rewrite from reaching
     // a destination the front door would have refused.
-    assertRouteAllowedByScope(admissionScope, inboundSelector, candidate);
     candidate.staticPolicy = captureRouteStaticPolicy(
       candidate.providerName,
       candidate.modelId,
@@ -521,6 +521,11 @@ export async function prepareResponsesRequest(
       candidate.staticPolicy.effectiveAlias,
       inboundWire,
     );
+    // Fast-only keys authorize the same billed lane that final normalization serializes.
+    assertRouteAllowedByScope(admissionScope, inboundSelector, {
+      providerName: candidate.providerName,
+      modelId: previewXaiOauthWireModel(parsed, candidate, config, inboundWire),
+    });
     return candidate;
   };
   try {

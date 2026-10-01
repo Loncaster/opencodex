@@ -255,6 +255,9 @@ overrides and the usage attempt. Only the serialized `model` changes (`raw.model
 `parsed._wireModelOverride` for openai-chat), and `logCtx.wireModel` records it. The scope check treats
 that wire override as the billed destination, so a data-plane key must authorize
 `grok-4.7-build-fast` before the lane is dispatched even though routing and receipts retain grok-4.7.
+Initial admission previews the same Fast decision and operator wire policy as final serialization;
+a Fast-only scope needs no additional grant for the logical id. Plain turns, disabled Fast, key auth
+and explicit operator Fast wires still require their actual destination, without an implied lane grant.
 The attempt's tier outcome uses the internal `model-variant` Fast wire kind (applied, assumed). Its
 `responseTierAuthoritative:false` keeps a `service_tier` echo from confirming or denying it, and from
 unlocking priority pricing, so estimates stay at grok-4.7's standard rate. The passthrough relays the

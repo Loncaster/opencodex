@@ -729,6 +729,11 @@ record `grok-4.7-build-fast` as the wire model. API-key mode is unchanged: build
 public API, so Grok 4.7 Fast there still means priority processing. An explicit
 `xai/grok-4.7-build-fast` selection from an earlier configuration keeps working.
 
+For an opencodex API key with `allowedModels`, OAuth Fast requests require
+`xai/grok-4.7-build-fast` (or its bare model id). Allowing only `xai/grok-4.7` does not authorize
+the Fast lane. A key allowing only the Fast wire model can use Fast; plain requests or disabled
+Fast still require `xai/grok-4.7`. Provider restrictions continue to apply.
+
 xAI charges Priority Processing at 2× the standard token price for input, output, cached, and
 reasoning tokens; cache discounts are applied before the multiplier. Cost estimates use that premium
 only when xAI's response confirms `service_tier: "priority"`. A missing or unparsed response tier is

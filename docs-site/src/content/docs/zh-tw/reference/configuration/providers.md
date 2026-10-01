@@ -293,6 +293,8 @@ Cursor 伺服器驅動的本機工具預設停用。Codex 繼續使用其自身�
 
 Grok 4.7 在 OAuth 上支援 Fast，提供 `low` / `medium` / `high` / `xhigh`，context window 為 500,000。依 [xAI 標準價格](https://docs.x.ai/developers/models/grok-4.7)，每百萬 token 的輸入、快取輸入及輸出費用分別為 $2.00、$0.50 及 $6.00；context 達 200,000 token 時分別為 $4.00 / $1.00 / $12.00。
 
+對於透過 `allowedModels` 限制的 opencodex API 金鑰，OAuth Fast 請求需要允許 `xai/grok-4.7-build-fast`（或不含供應商前綴的模型 ID）。僅允許 `xai/grok-4.7` 不會授予 Fast 權限。僅允許 Fast 模型的金鑰可以使用 Fast；一般請求或關閉 Fast 時仍需允許 `xai/grok-4.7`。供應商限制仍然有效。
+
 ## OpenRouter 供應商路由
 
 OpenRouter 可透過多個推論供應商提供一個模型。`openRouterRouting` 將請求保持在偏好的供應商上；`modelOpenRouterRouting` 為精確 model id 取代它。這對 prompt-cache 親和性很有用，因為 cache 支援、保留、命中率與定價因推論供應商而異。

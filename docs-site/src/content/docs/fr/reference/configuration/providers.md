@@ -386,6 +386,8 @@ acceptez le contournement des autorisations Codex et de la sémantique du bac à
 
 Grok 4.7 propose le mode Fast sur OAuth, avec `low` / `medium` / `high` / `xhigh` et une fenêtre de 500 000 jetons. Son [tarif xAI](https://docs.x.ai/developers/models/grok-4.7) standard par million de jetons est de 2,00 $ en entrée, 0,50 $ en entrée mise en cache et 6,00 $ en sortie ; à partir de 200 000 jetons de contexte, les tarifs sont de 4,00 $ / 1,00 $ / 12,00 $.
 
+Avec une clé API opencodex limitée par `allowedModels`, les requêtes Fast via OAuth exigent `xai/grok-4.7-build-fast` (ou son identifiant sans préfixe). Autoriser uniquement `xai/grok-4.7` ne donne pas accès à Fast. Une clé limitée au modèle Fast peut utiliser Fast ; les requêtes ordinaires ou Fast désactivé exigent toujours `xai/grok-4.7`. Les restrictions de fournisseur restent applicables.
+
 ## Routage des fournisseurs OpenRouter
 
 OpenRouter peut servir un modèle au moyen de plusieurs fournisseurs d'inférence. `openRouterRouting` maintient les
