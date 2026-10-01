@@ -597,5 +597,4 @@ runtime, so no boundary accepts a value another rejects.
 public request model. [Memory phase routing](transports/responses-failover.md#memory-phase-routing)
 owns the selection rule.
 
-Preflight heartbeat retention keeps `replayUnsafe` sticky in the replayed tail, so a second
-preflight cannot forget earlier side effects after the original marker is evicted.
+Preflight heartbeat retention keeps `replayUnsafe` sticky in the replayed tail, so a second preflight cannot forget earlier side effects after the original marker is evicted.
