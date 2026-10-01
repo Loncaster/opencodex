@@ -220,6 +220,29 @@ describe("Gemini tool schema type arrays", () => {
     ]);
   });
 
+  test("existing anyOf references still resolve at the original schema resource", () => {
+    const parameters = {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      $id: "https://schemas.example.test/tool.json",
+      $anchor: "tool", $dynamicAnchor: "toolDynamic",
+      type: ["object", "null"],
+      $defs: { Query: { type: ["string", "null"], minLength: 1 } },
+      definitions: { Count: { type: "integer", minimum: 0 } },
+      anyOf: [{ properties: { query: { $ref: "#/$defs/Query" }, count: { $ref: "#/definitions/Count" } } }, { type: "null" }],
+    };
+    const original = JSON.stringify(parameters);
+    const out = normalizeDevinToolParameters("gemini-x", parameters) as any;
+    for (const key of ["$schema", "$id", "$anchor", "$dynamicAnchor"] as const) {
+      expect(out[key]).toBe(parameters[key]);
+    }
+    const properties = out.allOf.at(-1).anyOf[0].properties;
+    // Resolve the emitted references from the resource root, as JSON Pointer does.
+    const resolve = (ref: string) => ref.slice(2).split("/").reduce((node, key) => node?.[key], out);
+    expect(resolve(properties.query.$ref)).toEqual({ minLength: 1, anyOf: [{ type: "string" }, { type: "null" }] });
+    expect(resolve(properties.count.$ref)).toEqual({ type: "integer", minimum: 0 });
+    expect(JSON.stringify(parameters)).toBe(original);
+  });
+
   test("outer not and oneOf still constrain the null branch", () => {
     expect(normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], not: { type: "null" },

@@ -55,9 +55,13 @@ function splitTypeArray(node: Schema, types: unknown[]): Schema {
   if (!existing) return { ...annotations, ...rest, ...typeConstraint };
   // unevaluatedProperties/unevaluatedItems read annotations from sibling
   // applicators in their own subschema, so they cannot sit inside one allOf
-  // branch while the anyOf they observe sits in another. Keep them on the node.
+  // branch while the anyOf they observe sits in another. Resource identifiers
+  // and definition maps also stay here so references keep their base and paths.
   const elevated: Schema = {};
-  for (const key of ['unevaluatedProperties', 'unevaluatedItems']) {
+  for (const key of [
+    'unevaluatedProperties', 'unevaluatedItems', '$defs', 'definitions',
+    '$id', '$schema', '$anchor', '$dynamicAnchor',
+  ]) {
     if (Object.hasOwn(rest, key)) {
       elevated[key] = rest[key];
       delete rest[key];
