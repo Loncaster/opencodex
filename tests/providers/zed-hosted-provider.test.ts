@@ -61,6 +61,81 @@ describe("Zed Hosted AI provider", () => {
     expect(normalizeZedProvider(undefined, "vendor-router-model")).toBe("open_ai");
   });
 
+  test("keeps the account token and user id out of upstream error messages", async () => {
+    globalThis.fetch = (async () => jsonResponse(
+      { message: "invalid credential user-secret-42 zed-account-token-xyz" },
+      401,
+    )) as typeof globalThis.fetch;
+
+    let message = "";
+    try {
+      await zedLlmFetch({ userId: "user-secret-42", accessToken: "zed-account-token-xyz" }, "/completions");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("Zed account lookup");
+    expect(message).not.toContain("user-secret-42");
+    expect(message).not.toContain("zed-account-token-xyz");
+  });
++  describe("credential-bearing rejections", () => {
+    const credentials = { userId: "user-secret-42", accessToken: "zed-account-token-xyz" };
+    const leaked = "connect failed for user-secret-42 with zed-account-token-xyz";
+
+    async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+      try {
+        await promise;
+      } catch (error) {
+        return error;
+      }
+      throw new Error("expected the Zed call to reject");
+    }
+
+    function expectScrubbed(error: unknown): void {
+      const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+      expect(text).not.toContain("user-secret-42");
+      expect(text).not.toContain("zed-account-token-xyz");
+      expect((error as { cause?: unknown }).cause).toBeUndefined();
+    }
+
+    test("scrubs a fetch rejection that echoes the account credential", async () => {
+      globalThis.fetch = (async () => { throw new Error(leaked); }) as unknown as typeof globalThis.fetch;
+      const error = await rejectionOf(zedLlmFetch(credentials, "/completions"));
+      expect(error).toBeInstanceOf(Error);
+      expectScrubbed(error);
+    });
+
+    test("scrubs a body-read rejection that echoes the account credential", async () => {
+      globalThis.fetch = (async () => new Response(new ReadableStream({
+        pull(controller) { controller.error(new Error(leaked)); },
+      }), { status: 200 })) as typeof globalThis.fetch;
+      const error = await rejectionOf(zedLlmFetch(credentials, "/completions"));
+      expectScrubbed(error);
+    });
+
+    test("keeps a numeric status on the scrubbed replacement", async () => {
+      globalThis.fetch = (async () => { throw Object.assign(new Error(leaked), { status: 503 }); }) as unknown as typeof globalThis.fetch;
+      const error = await rejectionOf(zedLlmFetch(credentials, "/completions"));
+      expectScrubbed(error);
+      expect((error as { status?: unknown }).status).toBe(503);
+    });
+
+    test("keeps a credential-bearing abort an AbortError without the credential", async () => {
+      globalThis.fetch = (async () => { throw new DOMException(leaked, "AbortError"); }) as unknown as typeof globalThis.fetch;
+      const error = await rejectionOf(zedLlmFetch(credentials, "/completions"));
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe("AbortError");
+      expectScrubbed(error);
+    });
+
+    test("rethrows a clean abort by identity", async () => {
+      const abort = new DOMException("The operation was aborted.", "AbortError");
+      globalThis.fetch = (async () => { throw abort; }) as unknown as typeof globalThis.fetch;
+      const error = await rejectionOf(zedLlmFetch(credentials, "/completions"));
+      expect(error).toBe(abort);
+    });
+  });
+
   test("refreshes the short-lived LLM token on Zed expiry signals", async () => {
     const calls: Array<{ request: Request; body: string }> = [];
     const responses = [

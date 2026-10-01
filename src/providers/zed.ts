@@ -214,7 +214,51 @@ function systemHeaders(credentials: ZedCredentials): Record<string, string> {
   return credentials.systemId ? { [ZED_HEADERS.systemId]: credentials.systemId } : {};
 }
 
-async function responseJson(response: Response, label: string): Promise<unknown> {
+/** Remove the account token and user id from upstream text before it can reach an error or log. */
+function scrubZedCredentials(text: string, credentials: ZedCredentials): string {
+  let scrubbed = text;
+  for (const secret of [credentials.accessToken, credentials.userId]) {
+    const value = secret?.trim();
+    if (value) scrubbed = scrubbed.split(value).join("[redacted]");
+  }
+  return redactSecretString(scrubbed);
+}
+
+function rejectionMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function containsZedCredential(text: string, credentials: ZedCredentials): boolean {
+  return [credentials.accessToken, credentials.userId].some((secret) => {
+    const value = secret?.trim();
+    return Boolean(value) && text.includes(value!);
+  });
+}
+
+/**
+ * Rethrow a rejection from a credential-bearing Zed call without the account token or user id.
+ *
+ * The decision is made on content alone: a rejection that carries neither value is rethrown by
+ * identity, so a clean abort stays the same object. One that carries either is replaced, keeping
+ * its `name` (a DOMException stays a DOMException, so AbortError/TimeoutError still read as
+ * cancellation) and any numeric `status`. The original is not kept as `cause`, because its
+ * message is exactly what must not travel.
+ */
+export function scrubZedRejection(error: unknown, credentials: ZedCredentials): never {
+  const message = rejectionMessage(error);
+  const name = error instanceof Error ? error.name : "Error";
+  if (!containsZedCredential(message, credentials) && !containsZedCredential(name, credentials)) throw error;
+  const scrubbed = scrubZedCredentials(message, credentials);
+  const safeName = containsZedCredential(name, credentials) ? "Error" : name;
+  const replacement: Error = error instanceof DOMException
+    ? new DOMException(scrubbed, safeName)
+    : Object.assign(new Error(scrubbed), { name: safeName });
+  const status = error && typeof error === "object" ? (error as { status?: unknown }).status : undefined;
+  if (typeof status === "number") Object.assign(replacement, { status });
+  throw replacement;
+}
+
+async function responseJson(response: Response, label: string, credentials: ZedCredentials): Promise<unknown> {
   const length = Number(response.headers.get("content-length"));
   if (Number.isFinite(length) && length > SMALL_RESPONSE_MAX_BYTES) {
     await response.body?.cancel().catch(() => undefined);
@@ -258,7 +302,7 @@ async function responseJson(response: Response, label: string): Promise<unknown>
     ? record.error as Record<string, unknown>
     : undefined;
   const message = stringValue(record?.message) ?? stringValue(nested?.message) ?? `HTTP ${response.status}`;
-  const error = new Error(`${label}: ${redactSecretString(message)}`);
+  const error = new Error(`${label}: ${scrubZedCredentials(message, credentials)}`);
   Object.assign(error, { status: response.status });
   throw error;
 }
@@ -268,16 +312,21 @@ export async function fetchZedAuthenticatedUser(
   options: ZedRequestOptions = {},
 ): Promise<Record<string, unknown>> {
   const fetchFn = options.fetchFn ?? globalThis.fetch;
-  const response = await fetchFn(zedUrl("/client/users/me"), {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: buildZedUserAuthHeader(credentials),
-      ...systemHeaders(credentials),
-    },
-    signal: options.signal,
-  });
-  const value = await responseJson(response, "Zed account lookup");
+  let value: unknown;
+  try {
+    const response = await fetchFn(zedUrl("/client/users/me"), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: buildZedUserAuthHeader(credentials),
+        ...systemHeaders(credentials),
+      },
+      signal: options.signal,
+    });
+    value = await responseJson(response, "Zed account lookup", credentials);
+  } catch (error) {
+    scrubZedRejection(error, credentials);
+  }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Zed account lookup returned an invalid response");
   return value as Record<string, unknown>;
 }
@@ -329,18 +378,23 @@ export async function fetchZedLlmToken(
   if (!options.forceRefresh && cached && cached.expiresAt > Date.now()) return cached.token;
   const organizationId = await resolveOrganization(credentials, options);
   const fetchFn = options.fetchFn ?? globalThis.fetch;
-  const response = await fetchFn(zedUrl("/client/llm_tokens"), {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: buildZedUserAuthHeader(credentials),
-      ...systemHeaders(credentials),
-    },
-    body: JSON.stringify({ organization_id: organizationId }),
-    signal: options.signal,
-  });
-  const data = await responseJson(response, "Zed LLM token exchange");
+  let data: unknown;
+  try {
+    const response = await fetchFn(zedUrl("/client/llm_tokens"), {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: buildZedUserAuthHeader(credentials),
+        ...systemHeaders(credentials),
+      },
+      body: JSON.stringify({ organization_id: organizationId }),
+      signal: options.signal,
+    });
+    data = await responseJson(response, "Zed LLM token exchange", credentials);
+  } catch (error) {
+    scrubZedRejection(error, credentials);
+  }
   const record = data && typeof data === "object" && !Array.isArray(data)
     ? data as Record<string, unknown>
     : undefined;
@@ -370,11 +424,15 @@ export async function zedLlmFetch(
     const token = await fetchZedLlmToken(credentials, { ...options, forceRefresh });
     const headers = new Headers(options.fetchInit?.headers);
     headers.set("Authorization", `Bearer ${token}`);
-    return fetchFn(zedUrl(path, options.baseUrl), {
-      ...options.fetchInit,
-      headers,
-      signal: options.signal,
-    });
+    try {
+      return await fetchFn(zedUrl(path, options.baseUrl), {
+        ...options.fetchInit,
+        headers,
+        signal: options.signal,
+      });
+    } catch (error) {
+      scrubZedRejection(error, credentials);
+    }
   };
   let response = await request(false);
   if (shouldRefreshZedLlmToken(response)) {
