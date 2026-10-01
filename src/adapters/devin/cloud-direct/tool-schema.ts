@@ -49,7 +49,7 @@ function splitTypeArray(node: Schema, types: unknown[]): Schema {
     && (!Array.isArray(rest.enum) || rest.enum.includes(null))
     && (!Object.hasOwn(rest, 'const') || rest.const === null);
   const branches = concrete.map((type) => ({ type }));
-  if (allowsNull) branches.push({ type: 'null' });
+  if (allowsNull || branches.length === 0) branches.push({ type: 'null' });
   const typeConstraint: Schema = branches.length === 1 ? branches[0]! : { anyOf: branches };
   const existing = Array.isArray(node.anyOf) ? node.anyOf : undefined;
   if (!existing) return { ...annotations, ...rest, ...typeConstraint };

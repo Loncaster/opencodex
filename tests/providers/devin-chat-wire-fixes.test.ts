@@ -185,6 +185,21 @@ describe("Gemini tool schema type arrays", () => {
     });
   });
 
+  for (const restriction of [{ enum: ["a"] }, { const: "a" }]) {
+    test(`a null-only type stays valid when ${Object.keys(restriction)[0]} excludes null`, () => {
+      const parameters = { type: ["null"], ...restriction };
+      // A null type and its excluding sibling constraint remain unsatisfiable,
+      // without replacing a valid schema with the invalid applicator anyOf: [].
+      expect(normalizeDevinToolParameters("gemini-x", parameters)).toEqual({ type: "null", ...restriction });
+      const anyOf = [{ type: "null" }];
+      const allOf = [{ title: "existing index zero" }];
+      expect(normalizeDevinToolParameters("gemini-x", { ...parameters, anyOf, allOf })).toEqual({
+        ...restriction, anyOf, allOf: [...allOf, { type: "null" }],
+      });
+      expect(parameters.type).toEqual(["null"]);
+    });
+  }
+
   test("an existing anyOf null branch keeps its own restrictions", () => {
     expect(normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], anyOf: [{ type: "string" }, { type: "null", const: "a" }],
