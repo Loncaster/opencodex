@@ -53,22 +53,11 @@ function splitTypeArray(node: Schema, types: unknown[]): Schema {
   const typeConstraint: Schema = branches.length === 1 ? branches[0]! : { anyOf: branches };
   const existing = Array.isArray(node.anyOf) ? node.anyOf : undefined;
   if (!existing) return { ...annotations, ...rest, ...typeConstraint };
-  // unevaluatedProperties/unevaluatedItems read annotations from sibling
-  // applicators in their own subschema, so they cannot sit inside one allOf
-  // branch while the anyOf they observe sits in another. Resource identifiers
-  // and definition maps also stay here so references keep their base and paths.
-  const elevated: Schema = {};
-  for (const key of [
-    'unevaluatedProperties', 'unevaluatedItems', '$defs', 'definitions',
-    '$id', '$schema', '$anchor', '$dynamicAnchor',
-  ]) {
-    if (Object.hasOwn(rest, key)) {
-      elevated[key] = rest[key];
-      delete rest[key];
-    }
-  }
-  const constraints = Object.keys(rest).length === 0 ? [] : [rest];
-  return { ...annotations, ...elevated, allOf: [...constraints, typeConstraint, { anyOf: existing }] };
+  // Keep existing applicators and constraints at their original JSON Pointer
+  // locations. Appending only the type constraint also preserves allOf indices,
+  // resource scopes, and the sibling annotations read by unevaluated* keywords.
+  const allOf = Array.isArray(rest.allOf) ? rest.allOf : [];
+  return { ...annotations, ...rest, anyOf: existing, allOf: [...allOf, typeConstraint] };
 }
 
 function rewrite(node: unknown): unknown {

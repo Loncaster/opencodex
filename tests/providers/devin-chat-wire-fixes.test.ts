@@ -137,16 +137,14 @@ describe("Gemini tool schema type arrays", () => {
     });
   });
 
-  test("a branch that contradicts an outer keyword keeps both constraints under allOf", () => {
+  test("a branch that contradicts an outer keyword keeps both constraints conjoined", () => {
     const out = normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], maxLength: 5, anyOf: [{ maxLength: 50 }, { type: "null" }],
     }) as any;
     expect(out).toEqual({
-      allOf: [
-        { maxLength: 5 },
-        { anyOf: [{ type: "string" }, { type: "null" }] },
-        { anyOf: [{ maxLength: 50 }, { type: "null" }] },
-      ],
+      maxLength: 5,
+      anyOf: [{ maxLength: 50 }, { type: "null" }],
+      allOf: [{ anyOf: [{ type: "string" }, { type: "null" }] }],
     });
   });
 
@@ -155,11 +153,9 @@ describe("Gemini tool schema type arrays", () => {
       type: ["string", "null"], minLength: 2, anyOf: [{ type: "integer" }],
     }) as any;
     expect(out).toEqual({
-      allOf: [
-        { minLength: 2 },
-        { anyOf: [{ type: "string" }, { type: "null" }] },
-        { anyOf: [{ type: "integer" }] },
-      ],
+      minLength: 2,
+      anyOf: [{ type: "integer" }],
+      allOf: [{ anyOf: [{ type: "string" }, { type: "null" }] }],
     });
   });
 
@@ -169,15 +165,14 @@ describe("Gemini tool schema type arrays", () => {
     }) as any;
     expect(out.allOf).toEqual([
       { anyOf: [{ type: "object" }, { type: "null" }] },
-      { anyOf: [{ required: ["a"] }, { required: ["b"] }] },
     ]);
+    expect(out.anyOf).toEqual([{ required: ["a"] }, { required: ["b"] }]);
     const typed = normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], anyOf: [{ type: "string", format: "date" }, { type: "integer" }],
     }) as any;
     expect(typed).toEqual({
-      allOf: [{ anyOf: [{ type: "string" }, { type: "null" }] }, {
-        anyOf: [{ type: "string", format: "date" }, { type: "integer" }],
-      }],
+      anyOf: [{ type: "string", format: "date" }, { type: "integer" }],
+      allOf: [{ anyOf: [{ type: "string" }, { type: "null" }] }],
     });
   });
 
@@ -194,10 +189,8 @@ describe("Gemini tool schema type arrays", () => {
     expect(normalizeDevinToolParameters("gemini-x", {
       type: ["string", "null"], anyOf: [{ type: "string" }, { type: "null", const: "a" }],
     })).toEqual({
-      allOf: [
-        { anyOf: [{ type: "string" }, { type: "null" }] },
-        { anyOf: [{ type: "string" }, { type: "null", const: "a" }] },
-      ],
+      anyOf: [{ type: "string" }, { type: "null", const: "a" }],
+      allOf: [{ anyOf: [{ type: "string" }, { type: "null" }] }],
     });
   });
 
@@ -216,8 +209,8 @@ describe("Gemini tool schema type arrays", () => {
     expect(JSON.stringify(out.allOf)).not.toContain("unevaluatedItems");
     expect(out.allOf).toEqual([
       { anyOf: [{ type: "object" }, { type: "null" }] },
-      { anyOf: [{ properties: { a: { type: "string" } } }, { type: "null" }] },
     ]);
+    expect(out.anyOf).toEqual([{ properties: { a: { type: "string" } } }, { type: "null" }]);
   });
 
   test("existing anyOf references still resolve at the original schema resource", () => {
@@ -235,7 +228,7 @@ describe("Gemini tool schema type arrays", () => {
     for (const key of ["$schema", "$id", "$anchor", "$dynamicAnchor"] as const) {
       expect(out[key]).toBe(parameters[key]);
     }
-    const properties = out.allOf.at(-1).anyOf[0].properties;
+    const properties = out.anyOf[0].properties;
     // Resolve the emitted references from the resource root, as JSON Pointer does.
     const resolve = (ref: string) => ref.slice(2).split("/").reduce((node, key) => node?.[key], out);
     expect(resolve(properties.query.$ref)).toEqual({ minLength: 1, anyOf: [{ type: "string" }, { type: "null" }] });
@@ -257,6 +250,39 @@ describe("Gemini tool schema type arrays", () => {
       anyOf: [{ type: "string" }, { type: "null" }],
     });
   });
+
+  for (const withAllOf of [false, true]) {
+    test(`JSON Pointer targets keep anyOf and existing allOf indices (${withAllOf ? "with" : "without"} allOf)`, () => {
+      const parameters = {
+        type: ["object", "null"],
+        anyOf: [{ properties: {
+          a: { type: "string" }, b: { $ref: "#/anyOf/0/properties/a" },
+        } }, { type: "null" }],
+        ...(withAllOf ? { allOf: [
+          { properties: { c: { type: "integer" } } },
+          { properties: { d: { $ref: "#/allOf/0/properties/c" } } },
+        ] } : {}),
+      };
+      const original = JSON.stringify(parameters);
+      const out = normalizeDevinToolParameters("gemini-x", parameters) as any;
+      const resolve = (ref: string) => ref.slice(2).split("/").reduce((node, key) => node?.[key], out);
+      // Resolve the original pointer before inspecting the output's shape: relocating
+      // anyOf/allOf must fail as a missing target, not merely as a different spelling.
+      expect(resolve("#/anyOf/0/properties/a")).toEqual({ type: "string" });
+      const ref = out.anyOf[0].properties.b.$ref;
+      expect(ref).toBe("#/anyOf/0/properties/a");
+      expect(resolve(ref)).toEqual({ type: "string" });
+      if (withAllOf) {
+        expect(resolve("#/allOf/0/properties/c")).toEqual({ type: "integer" });
+        expect(out.allOf[1].properties.d.$ref).toBe("#/allOf/0/properties/c");
+        expect(resolve(out.allOf[1].properties.d.$ref)).toEqual({ type: "integer" });
+        expect(out.allOf.slice(0, 2)).toEqual(parameters.allOf);
+      }
+      expect(out.allOf.at(-1)).toEqual({ anyOf: [{ type: "object" }, { type: "null" }] });
+      expect(out.allOf).toHaveLength(withAllOf ? 3 : 1);
+      expect(JSON.stringify(parameters)).toBe(original);
+    });
+  }
 
   test("nested multi-type schemas grow linearly", () => {
     let nested: unknown = { type: "string" };
