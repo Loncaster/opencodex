@@ -1,10 +1,15 @@
 import type { OcxProviderConfig } from "../types";
 import { redactSecretString } from "./redact";
 import { runtimeProviderFetch } from "./provider-runtime-fetch";
-import { resolveProxyRoute } from "./proxy-env";
+import { markEgressTransparentExecutor } from "./provider-egress";
+import { outboundProxyConfigured, resolveProxyRoute, type ProxyEnvMap } from "./proxy-env";
 
 export type ProviderTlsProfile = "antigravity-browser";
-export type ProviderTlsProfileStatus = "disabled" | "active" | "failed";
+/**
+ * `pending` means the profile is configured and valid but no request has used it yet; the
+ * dashboard must not report a configured profile as `disabled` before its first send.
+ */
+export type ProviderTlsProfileStatus = "disabled" | "pending" | "active" | "failed";
 export const ANTIGRAVITY_TLS_HOSTS = new Set([
   "daily-cloudcode-pa.googleapis.com",
   "cloudcode-pa.googleapis.com",
@@ -12,6 +17,7 @@ export const ANTIGRAVITY_TLS_HOSTS = new Set([
 type TlsRuntime = {
   fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>;
   resolveProxyRoute?: typeof resolveProxyRoute;
+  env?: ProxyEnvMap;
 };
 let status = new Map<string, ProviderTlsProfileStatus>();
 let runtime: TlsRuntime | undefined;
@@ -55,8 +61,12 @@ export function providerTlsProfileConfigError(
 
 export function getProviderTlsProfileStatus(
   name: string,
+  configured?: boolean,
 ): ProviderTlsProfileStatus {
-  return status.get(name) ?? "disabled";
+  const recorded = status.get(name);
+  if (configured === undefined) return recorded ?? "disabled";
+  if (!configured) return "disabled";
+  return recorded === undefined || recorded === "disabled" ? "pending" : recorded;
 }
 
 export function resetProviderTlsProfileForTests(): void {
@@ -82,6 +92,53 @@ function preserveTransportError(error: unknown): Error {
   return wrapped;
 }
 
+/** Proxy schemes the native TLS transport can carry for a route decided elsewhere. */
+const TLS_PROXY_PROTOCOLS = new Set(["http:", "https:", "socks5:", "socks5h:"]);
+
+function requireDirect(env: ProxyEnvMap): Record<string, never> {
+  // The native transport reads HTTP_PROXY/HTTPS_PROXY/ALL_PROXY itself whenever no proxy option
+  // is given, and it has no per-request "direct" switch. A direct route is therefore only
+  // honoured when no proxy variable exists at all; otherwise omitting the option would send the
+  // credential through the environment proxy the operator routed this request away from.
+  if (outboundProxyConfigured(env)) {
+    throw new Error("provider TLS profile cannot force a direct connection while a proxy environment variable is set");
+  }
+  return {};
+}
+
+/**
+ * The proxy option expressing this send's route on the native transport, or a refusal.
+ *
+ * `sendWithConnectionPolicy` resolves the per-provider egress (`providers.<name>.proxy` /
+ * `noProxy`) and passes it as `init.proxy`: a URL, `false` for direct, or absent when the
+ * provider inherits the global environment route.
+ */
+function tlsProxyOption(init: RequestInit | undefined, destination: string | URL): { proxy?: string } {
+  const env = runtime?.env ?? process.env;
+  const decided = init !== undefined && Object.hasOwn(init, "proxy")
+    ? (init as RequestInit & { proxy?: unknown }).proxy
+    : undefined;
+  if (typeof decided === "string") {
+    let protocol: string;
+    try {
+      protocol = new URL(decided).protocol;
+    } catch {
+      throw new Error("provider TLS profile cannot preserve configured proxy semantics");
+    }
+    if (!TLS_PROXY_PROTOCOLS.has(protocol)) {
+      throw new Error("provider TLS profile cannot preserve configured proxy semantics");
+    }
+    return { proxy: decided };
+  }
+  if (decided === false) return requireDirect(env);
+  const route = (runtime?.resolveProxyRoute ?? resolveProxyRoute)(new URL(destination), env);
+  if (route.kind === "fallback") {
+    throw new Error("provider TLS profile cannot preserve configured proxy semantics");
+  }
+  if (route.kind === "proxy") return { proxy: route.proxy };
+  return requireDirect(env);
+}
+
 export function providerTlsFetch(
   name: string,
   provider: Pick<
@@ -100,31 +157,32 @@ export function providerTlsFetch(
       throw new Error("invalid provider TLS profile");
     }) as unknown as typeof globalThis.fetch;
   }
-  return (async (input, init) => {
+  // Transparent to provider egress: the route decided at the physical send arrives as
+  // `init.proxy` and is either carried by the native transport or refused below.
+  return markEgressTransparentExecutor((async (input, init) => {
     const destination =
       typeof input === "string" || input instanceof URL ? input : input.url;
-    if (!isCanonicalAntigravityUrl(destination))
+    if (!isCanonicalAntigravityUrl(destination)) {
+      status.set(name, "failed");
       throw new Error("provider TLS profile refused noncanonical destination");
+    }
     try {
       const configured = runtimeProviderFetch(
         provider as OcxProviderConfig,
         name,
       );
+      const proxyOption = tlsProxyOption(init, destination);
       const mod =
-        runtime ?? ((await import("wreq-js")) as unknown as TlsRuntime);
-      const proxyRoute = (runtime?.resolveProxyRoute ?? resolveProxyRoute)(
-        new URL(destination),
-      );
-      if (proxyRoute.kind === "fallback")
-        throw new Error(
-          "provider TLS profile cannot preserve configured proxy semantics",
-        );
-      const response = await (configured ?? mod.fetch)(input, {
-        ...init,
+        configured === undefined
+          ? runtime ?? ((await import("wreq-js")) as unknown as TlsRuntime)
+          : undefined;
+      const { proxy: _decidedRoute, ...rest } = (init ?? {}) as RequestInit & { proxy?: unknown };
+      const response = await (configured ?? mod!.fetch)(input, {
+        ...rest,
         redirect: "manual",
         browser: "chrome_142",
         os: "windows",
-        ...(proxyRoute.kind === "proxy" ? { proxy: proxyRoute.proxy } : {}),
+        ...proxyOption,
       } as RequestInit & { browser: string; os: string });
       status.set(name, "active");
       return response;
@@ -135,5 +193,5 @@ export function providerTlsFetch(
       }
       throw preserveTransportError(error);
     }
-  }) as typeof globalThis.fetch;
+  }) as typeof globalThis.fetch);
 }

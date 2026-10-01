@@ -255,7 +255,8 @@ export function providerFetch(
   const base = customExecutor ?? configuredFetch;
   const transport = options.providerName ? providerTlsFetch(options.providerName, provider, base) : base;
   const preconnect = (...args: Parameters<typeof globalThis.fetch.preconnect>): void => {
-    base.preconnect?.(...args);
+    // A TLS profile owns the handshake; a Bun preconnect would open a differently fingerprinted one.
+    if (transport === base) base.preconnect?.(...args);
   };
   // Rebuilt dispatches must use the same physical-send boundary as ordinary HTTP sends.
   // Return the original 3xx so the response owner retains its retry/health/relay contract.
@@ -283,7 +284,7 @@ export function providerFetch(
       // the override may rebuild against a different host and select a different transport, and
       // refusing on this destination would reject a request whose real route is fine.
       if (options.dispatchOverride) egressFor(input);
-      else providerEgressSendInit(egressBinding, base, input);
+      else providerEgressSendInit(egressBinding, transport, input);
       // The hook inspects the outgoing headers and refuses the send by throwing; it is not a
       // mutator, and the copy it receives is deliberately not threaded onward. `Connection`
       // is decided inside `dispatch`, which runs after this, so the fresh-connection policy
