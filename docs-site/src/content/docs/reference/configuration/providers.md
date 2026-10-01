@@ -729,10 +729,13 @@ record `grok-4.7-build-fast` as the wire model. API-key mode is unchanged: build
 public API, so Grok 4.7 Fast there still means priority processing. An explicit
 `xai/grok-4.7-build-fast` selection from an earlier configuration keeps working.
 
-For an opencodex API key with `allowedModels`, OAuth Fast requests require
-`xai/grok-4.7-build-fast` (or its bare model id). Allowing only `xai/grok-4.7` does not authorize
-the Fast lane. A key allowing only the Fast wire model can use Fast; plain requests or disabled
-Fast still require `xai/grok-4.7`. Provider restrictions continue to apply.
+When no explicit provider `fastWire` is configured, an opencodex API key restricted by
+`allowedModels` must permit `xai/grok-4.7-build-fast` (or its bare model id) for OAuth Fast.
+Allowing only `xai/grok-4.7` does not authorize this Fast model variant. A key allowing only
+the Fast wire model can use it; plain requests or disabled Fast still require `xai/grok-4.7`.
+With an explicit provider `fastWire`, permit the actual wire model instead. For example, a
+`service-tier` wire keeps `xai/grok-4.7` and requires permission for that model. Provider
+restrictions continue to apply.
 These rules apply to Responses, Chat Completions, Messages, and routed compaction requests.
 
 xAI charges Priority Processing at 2× the standard token price for input, output, cached, and

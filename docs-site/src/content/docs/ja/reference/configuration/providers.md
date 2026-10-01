@@ -329,7 +329,7 @@ Anthropic アカウント ポリシーのリスクを理解していない限り
 
 Grok 4.7 は OAuth で Fast を利用でき、`low` / `medium` / `high` / `xhigh` と 500,000 トークンのコンテキストを提供します。[xAI の標準料金](https://docs.x.ai/developers/models/grok-4.7)は 100 万トークンあたり入力 2.00 ドル、キャッシュ入力 0.50 ドル、出力 6.00 ドルです。コンテキストが 200,000 トークン以上の場合は 4.00 / 1.00 / 12.00 ドルになります。
 
-`allowedModels` で制限した opencodex API キーでは、OAuth の Fast リクエストに `xai/grok-4.7-build-fast`（またはプロバイダー名を除いたモデル ID）の許可が必要です。`xai/grok-4.7` だけの許可では Fast を利用できません。Fast モデルだけを許可したキーでも Fast を利用できますが、通常のリクエストや Fast が無効な場合には `xai/grok-4.7` の許可が必要です。プロバイダーの制限も引き続き適用されます。
+プロバイダーの `fastWire` を明示的に設定していない場合、`allowedModels` で制限した opencodex API キーの OAuth Fast リクエストには、`xai/grok-4.7-build-fast`（またはプロバイダー名を除いたモデル ID）の許可が必要です。`xai/grok-4.7` だけの許可では、この Fast モデルを利用できません。Fast モデルだけを許可したキーでも利用できますが、通常のリクエストや Fast が無効な場合には `xai/grok-4.7` の許可が必要です。`fastWire` を明示的に設定した場合は、実際に送信されるモデルを許可してください。例えば、`service-tier` 方式では `xai/grok-4.7` が維持され、そのモデルの許可が必要です。プロバイダーの制限も引き続き適用されます。
 
 ## OpenRouter プロバイダーのルーティング
 

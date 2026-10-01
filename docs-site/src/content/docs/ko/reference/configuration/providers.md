@@ -328,7 +328,7 @@ Cursor 서버 주도 로컬 도구는 기본값으로 비활성화됩니다. Cod
 
 Grok 4.7은 OAuth에서 Fast를 지원하며, `low` / `medium` / `high` / `xhigh`와 500,000토큰 컨텍스트 창을 제공합니다. [xAI 표준 요금](https://docs.x.ai/developers/models/grok-4.7)은 100만 토큰당 입력 $2.00, 캐시 입력 $0.50, 출력 $6.00이며, 컨텍스트가 200,000토큰 이상이면 각각 $4.00 / $1.00 / $12.00입니다.
 
-`allowedModels`로 제한한 opencodex API 키의 OAuth Fast 요청에는 `xai/grok-4.7-build-fast`(또는 공급자 접두사 없는 모델 ID)의 허용이 필요합니다. `xai/grok-4.7`만 허용하면 Fast를 사용할 수 없습니다. Fast 모델만 허용한 키도 Fast를 사용할 수 있지만, 일반 요청이나 Fast가 비활성화된 요청에는 여전히 `xai/grok-4.7` 허용이 필요합니다. 공급자 제한도 계속 적용됩니다.
+공급자 `fastWire`를 명시적으로 설정하지 않았다면, `allowedModels`로 제한한 opencodex API 키의 OAuth Fast 요청에는 `xai/grok-4.7-build-fast`(또는 공급자 접두사 없는 모델 ID)의 허용이 필요합니다. `xai/grok-4.7`만 허용하면 이 Fast 모델을 사용할 수 없습니다. Fast 모델만 허용한 키도 사용할 수 있지만, 일반 요청이나 Fast가 비활성화된 요청에는 `xai/grok-4.7` 허용이 필요합니다. `fastWire`를 명시적으로 설정했다면 실제 전송되는 모델을 허용해야 합니다. 예를 들어 `service-tier` 방식은 `xai/grok-4.7`을 유지하므로 해당 모델의 허용이 필요합니다. 공급자 제한도 계속 적용됩니다.
 
 ## OpenRouter 공급자 라우팅
 

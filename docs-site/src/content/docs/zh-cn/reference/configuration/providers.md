@@ -360,7 +360,7 @@ Cursor 由服务端驱动的本地工具默认是禁用的。Codex 继续使用�
 
 Grok 4.7 在 OAuth 上支持 Fast，提供 `low` / `medium` / `high` / `xhigh`，上下文窗口为 500,000。按 [xAI 标准价格](https://docs.x.ai/developers/models/grok-4.7)，每百万 token 的输入、缓存输入和输出费用分别为 $2.00、$0.50 和 $6.00；上下文达到 200,000 token 时分别为 $4.00 / $1.00 / $12.00。
 
-对于通过 `allowedModels` 限制的 opencodex API 密钥，OAuth Fast 请求需要允许 `xai/grok-4.7-build-fast`（或不带提供商前缀的模型 ID）。仅允许 `xai/grok-4.7` 不会授予 Fast 权限。仅允许 Fast 模型的密钥可以使用 Fast；普通请求或关闭 Fast 时仍需允许 `xai/grok-4.7`。提供商限制仍然有效。
+未显式配置提供商的 `fastWire` 时，通过 `allowedModels` 限制的 opencodex API 密钥必须允许 `xai/grok-4.7-build-fast`（或不带提供商前缀的模型 ID），才能发送 OAuth Fast 请求。仅允许 `xai/grok-4.7` 不会授予此 Fast 模型的权限。仅允许 Fast 模型的密钥可以使用该模型；普通请求或关闭 Fast 时仍需允许 `xai/grok-4.7`。显式配置 `fastWire` 时，应允许实际发送的模型。例如，`service-tier` 方式保留 `xai/grok-4.7`，因此需要该模型的权限。提供商限制仍然有效。
 
 ## OpenRouter 提供者路由
 
