@@ -490,7 +490,7 @@ The account list marks Kiro accounts excluded from automatic selection with a re
 
 ## 3. API-key catalog
 
-opencodex ships 100 built-in presets: 83 key-based, 13 OAuth, three local, and one default
+opencodex ships 101 built-in presets: 83 key-based, 14 OAuth, three local, and one default
 ChatGPT-forward preset. The dashboard's **Add provider** picker opens a key provider's dashboard,
 validates the key, and stores it; validation is provider-specific. Notable entries:
 
