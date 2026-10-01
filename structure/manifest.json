@@ -199,7 +199,16 @@
       ]
     },
     {
-      "path": "transports/responses-spend.md",
+        "path": "transports/policy-fallback.md",
+        "tier": 3,
+        "title": "Policy Candidate Fallback",
+        "scope": "Original policy authorization, concrete candidate retries and physical destination deduplication.",
+        "documents": [
+          "src/server/"
+        ]
+      },
+      {
+        "path": "transports/responses-spend.md",
       "tier": 3,
       "title": "Responses Spend Reservations",
       "scope": "Credential-hop and durable spend reservations, and what a spent budget tells the client.",
@@ -268,6 +277,13 @@
       ]
     },
     {
+      "path": "providers/anthropic-account-thresholds.md",
+      "tier": 4,
+      "title": "Anthropic Account Thresholds",
+      "scope": "Account-owned usage thresholds, inheritance, routing boundaries and durable policy changes.",
+      "documents": ["src/oauth/"]
+    },
+    {
       "path": "providers-and-adapters.md",
       "tier": 4,
       "title": "Providers And Adapters",
@@ -282,6 +298,16 @@
         "src/server/",
         "src/types/",
         "src/web-search/"
+      ]
+    },
+    {
+      "path": "providers/anthropic-account-pool.md",
+      "tier": 4,
+      "title": "Anthropic Account Pool",
+      "scope": "Anthropic OAuth account pause, model routes, and quota labels.",
+      "documents": [
+        "src/oauth/",
+        "src/providers/"
       ]
     },
     {

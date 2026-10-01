@@ -1,4 +1,5 @@
 import type { ResponsesRequestContext, ResponsesAdmissionState, ResponsesDispatchers } from "./core-options";
+import { capturePolicyRequestRoute, assertPolicyNormalizedRoute, recordPolicyPreparedDestination, policyCandidateRefusalResponse } from "./policy-request-scope";
 import {
   agentTaskRecoveryConfig,
   restoreCachedEncryptedAgentTasks,
@@ -153,6 +154,8 @@ export async function prepareResponsesRequest(
   requestDispatchers: ResponsesDispatchers,
 ) {
   const { options, config, req, logCtx } = requestContext;
+  const policyScope = options.policyRequestScope ?? { triedDestinations: new Set<string>() };
+  const concreteSelection = options.comboAttempt || options.policyFallbackCandidate !== undefined;
 
   // The Chat and Anthropic surfaces replay through here with a Responses-shaped body,
   // so an omitted value means a genuine Responses inbound.
@@ -176,7 +179,7 @@ export async function prepareResponsesRequest(
       ? "system-derived"
       : options.promptCacheKeyIsSharedCohort === false ? "metadata-derived" : "caller",
   );
-  if (!options.comboAttempt && !options.compactionRoutingOverride && inboundWire === "responses") {
+  if (!concreteSelection && !options.compactionRoutingOverride && inboundWire === "responses") {
     options.compactionRoutingOverride = applyCompactionRoutingOverride(body, req.headers, config, {
       endpoint: "responses",
       transport: options.inboundTransport,
@@ -188,18 +191,18 @@ export async function prepareResponsesRequest(
   // more specific of the two settings and must be the one that survives when both match one request.
   const memoryModelPhase = options.memoryModelPhase
     ?? ((config.memoryModels?.extract || config.memoryModels?.consolidation)
-      && !options.comboAttempt && !options.compactionRoutingOverride && inboundWire === "responses"
+      && !concreteSelection && !options.compactionRoutingOverride && inboundWire === "responses"
       ? detectMemoryModelPhase(body, req.headers, { transport: options.inboundTransport }) ?? undefined
       : undefined);
   const memoryModelTarget = memoryModelPhase ? configuredMemoryModel(config, memoryModelPhase) : undefined;
   // A combo child is a synthetic replay of the parent's decision: its model is already the target's
   // concrete provider/model, so neither site below may rewrite or re-resolve it. It keeps the phase
   // through `options.memoryModelPhase` instead, which is what applies the phase effort.
-  const memoryModelApplies = memoryModelTarget !== undefined && options.comboAttempt !== true;
+  const memoryModelApplies = memoryModelTarget !== undefined && !concreteSelection;
   options.onRequestBodyParsed?.(body);
   // An effort row naming a table-less combo (`combo/x--high`) must reach the combo dispatcher
   // as its base id, so the selector is normalized here, before comboIdFromRawBody reads model.
-  const comboRows = !options.comboAttempt && body && typeof body === "object" && !Array.isArray(body)
+  const comboRows = !concreteSelection && body && typeof body === "object" && !Array.isArray(body)
     && typeof (body as { model?: unknown }).model === "string"
     // One parse for both grammars, from the selector as the client sent it. Parsing them
     // separately made the outcome depend on which ran first.
@@ -228,7 +231,7 @@ export async function prepareResponsesRequest(
   }
   // Compaction may send the last client-visible bare model after a combo switch.
   // Configured selectors take precedence; otherwise recall before combo dispatch (#3891).
-  if (!options.comboAttempt && !options.compactionRoutingOverride && body && typeof body === "object" && !Array.isArray(body)) {
+  if (!concreteSelection && !options.compactionRoutingOverride && body && typeof body === "object" && !Array.isArray(body)) {
     const rawModel = (body as { model?: unknown }).model;
     const rawInput = (body as { input?: unknown }).input;
     const isCompactionTrigger = Array.isArray(rawInput)
@@ -265,7 +268,7 @@ export async function prepareResponsesRequest(
   // A spawned sub-agent turn names its model on purpose; gpt-6-luna is both the helper
   // slug and a default sub-agent model, so neither intercept site may rewrite that turn.
   const threadSpawn = isThreadSpawnRequest(req.headers);
-  if (!options.comboAttempt && !options.compactionRoutingOverride && !threadSpawn && !memoryModelApplies && body && typeof body === "object" && !Array.isArray(body)) {
+  if (!concreteSelection && !options.compactionRoutingOverride && !threadSpawn && !memoryModelApplies && body && typeof body === "object" && !Array.isArray(body)) {
     const shadowIntercept = config.shadowCallIntercept;
     const rawShadowModel = (body as { model?: unknown }).model;
     if (shadowIntercept?.enabled && shadowIntercept.model && typeof rawShadowModel === "string"
@@ -283,7 +286,7 @@ export async function prepareResponsesRequest(
       }
     }
   }
-  const comboId = !options.comboAttempt ? comboIdFromRawBody(body, config) : null;
+  const comboId = !concreteSelection ? comboIdFromRawBody(body, config) : null;
   if (comboId && Object.hasOwn(config.combos ?? {}, comboId)) {
     options.onRequestBodyRead?.();
     return requestDispatchers.handleComboResponses(req, body, comboId, config, logCtx, {
@@ -514,6 +517,7 @@ export async function prepareResponsesRequest(
     // the key's scope at this one point is what stops a rewrite from reaching
     // a destination the front door would have refused.
     assertRouteAllowedByScope(admissionScope, inboundSelector, candidate);
+    capturePolicyRequestRoute(policyScope, candidate);
     candidate.staticPolicy = captureRouteStaticPolicy(
       candidate.providerName,
       candidate.modelId,
@@ -528,7 +532,7 @@ export async function prepareResponsesRequest(
     // no canonical OpenAI route for (#2901). Only the initial compaction route
     // may fall back to the configured default provider; combo attempts and the
     // later fallback/recovery re-routes keep the ordinary reservation.
-    const resolveRoute = (modelId: string) => captureInboundRoutePolicy(options.comboAttempt
+    const resolveRoute = (modelId: string) => captureInboundRoutePolicy(concreteSelection
       ? routeConcreteModel(config, modelId)
       : parsed._compactionRequest === true
         ? routeCompactionModel(config, modelId, evidenceFromBody(parsed._rawBody))
@@ -554,7 +558,7 @@ export async function prepareResponsesRequest(
     }
     const _sci = config.shadowCallIntercept;
     let shadowRoute: RouteResult | undefined;
-    if (!memoryRoute && !options.memoryModelPhase && !options.compactionRoutingOverride && !threadSpawn && _sci?.enabled && _sci.model && isShadowSourceModel(parsed.modelId, _sci.sourceModels)) {
+    if (!concreteSelection && !memoryRoute && !options.memoryModelPhase && !options.compactionRoutingOverride && !threadSpawn && _sci?.enabled && _sci.model && isShadowSourceModel(parsed.modelId, _sci.sourceModels)) {
       const sourcePrefix = shadowSourceModelPrefix(parsed.modelId, _sci.sourceModels)!;
       let sourceIdentity = { providerName: OPENAI_CODEX_PROVIDER_ID, modelId: sourcePrefix };
       try {
@@ -591,7 +595,8 @@ export async function prepareResponsesRequest(
       }
     }
     if (parsed._compactionRequest === true || options.compactionRoutingOverride) parsed._cursorIsolateConversation = true;
-    route = memoryRoute ?? shadowRoute ?? resolveRoute(parsed.modelId);
+    route = memoryRoute ?? shadowRoute ?? resolveRoute(options.policyFallbackCandidate
+      ? `${options.policyFallbackCandidate.provider}/${options.policyFallbackCandidate.model}` : parsed.modelId);
     // Name the phase in the persisted route decision, so the request log says why this turn went to
     // the memory destination instead of leaving it looking like a plain user selection. Set here, on
     // the resolved route, so a combo child's own route carries it too.
@@ -617,6 +622,8 @@ export async function prepareResponsesRequest(
     logCtx.routeDecision = route.routeDecision;
     logCtx.policyEligibility = route.policyEligibility;
   } catch (err) {
+    const policyRefusal = policyCandidateRefusalResponse(err);
+    if (policyRefusal) return policyRefusal;
     if (err instanceof AdmissionModelDeniedError) return admissionModelDeniedResponse(err);
     if (err instanceof NoAvailableComboTargetsError) {
       return comboUnavailable(err.comboId);
@@ -830,6 +837,8 @@ export async function prepareResponsesRequest(
         logCtx.routeDecision = route.routeDecision;
         logCtx.policyEligibility = route.policyEligibility;
       } catch (err) {
+        const policyRefusal = policyCandidateRefusalResponse(err);
+        if (policyRefusal) return policyRefusal;
         if (err instanceof AdmissionModelDeniedError) return admissionModelDeniedResponse(err);
         if (err instanceof NoAvailableComboTargetsError) {
           return comboUnavailable(err.comboId);
@@ -1042,6 +1051,8 @@ export async function prepareResponsesRequest(
               logCtx.routeDecision = route.routeDecision;
               logCtx.policyEligibility = route.policyEligibility;
             } catch (err) {
+              const policyRefusal = policyCandidateRefusalResponse(err);
+              if (policyRefusal) return policyRefusal;
               if (err instanceof AdmissionModelDeniedError) return admissionModelDeniedResponse(err);
               if (err instanceof NoAvailableComboTargetsError) {
                 return comboUnavailable(err.comboId);
@@ -1181,6 +1192,7 @@ export async function prepareResponsesRequest(
   // upstream for reliability (#875); the answer must then be reframed to SSE
   // for streaming clients.
   const clientRequestedStream = parsed.stream;
+  const admittedPolicyRoute = { providerName: route.providerName, modelId: route.modelId };
   await applyFinalRouteRequestNormalization({
     parsed,
     route,
@@ -1191,6 +1203,13 @@ export async function prepareResponsesRequest(
     inboundTransport: options.inboundTransport,
     claudeGoAffinity: options.claudeGoAffinity,
   });
+  try {
+    assertPolicyNormalizedRoute(policyScope, admittedPolicyRoute, route);
+  } catch (error) {
+    const policyRefusal = policyCandidateRefusalResponse(error);
+    if (policyRefusal) return policyRefusal;
+    throw error;
+  }
   // Normalization is the last thing that can move the destination: resolving an
   // OpenAI virtual model rewrites route.modelId to the wire id that will
   // actually be billed. A scope checked only before this would authorize the
@@ -1307,6 +1326,13 @@ export async function prepareResponsesRequest(
 
   route.provider = applyCodexAuthContextToProvider(route.provider, admissionState.authCtx, route.codexAccountMode);
   applyCodexAccountGatedWireNormalization(parsed, route, logCtx);
+  try {
+    recordPolicyPreparedDestination(policyScope, route.providerName, parsed._wireModelOverride ?? parsed.modelId);
+  } catch (error) {
+    const policyRefusal = policyCandidateRefusalResponse(error);
+    if (policyRefusal) return policyRefusal;
+    throw error;
+  }
   logCtx.provider = route.codexAccountNamespace
     ? `${route.providerName}-${route.codexAccountNamespace}`
     : formatCodexProviderForLog(route.providerName, codexLogAccountId(admissionState.authCtx), config);

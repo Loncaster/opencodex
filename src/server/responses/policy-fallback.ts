@@ -11,7 +11,8 @@ import { captureExplicitOpenAiCallerAuth } from "../../providers/openai-sidecar"
 import { captureCallerDirectAuth } from "../../providers/caller-authorization";
 import { resolvePolicyProfileId } from "../../routing/profile";
 import { parseSyntheticRowId } from "../fast-row";
-import { previewRouteModel } from "../../router";
+import { routeConcreteModel } from "../../router";
+import { isPolicyCandidateRefusal, policyWireDestination, type PolicyRequestScope } from "./policy-request-scope";
 
 type CoreHandler = typeof handleResponsesCore;
 type CoreOptions = Parameters<CoreHandler>[3];
@@ -28,15 +29,14 @@ function staysWithinPolicyAfterRedirect(
   config: OcxConfig,
   policyEligibility: ReadonlySet<string>,
   candidate: RouteCandidateTrace,
+  triedDestinations: ReadonlySet<string>,
 ): boolean {
-  // "blocked-model-redirect" can only arise from a configured redirect entry; without one the
-  // fallback hop reproduces the candidate's ordinary route.
-  if (Object.keys(config.blockedModelRedirects ?? {}).length === 0) return true;
   try {
-    // previewRouteModel: eligibility probing must not write combo selection state.
-    const routed = previewRouteModel(config, `${candidate.provider}/${candidate.model}`);
-    return routed.routeReason !== "blocked-model-redirect"
-      || policyEligibility.has(`${routed.providerName}\u0000${routed.modelId}`);
+    // Both inspection and execution resolve the original concrete candidate, without public
+    // combo/profile aliases or combo selection writes. A redirect must remain in the evaluation.
+    const routed = routeConcreteModel(config, `${candidate.provider}/${candidate.model}`);
+    return policyEligibility.has(`${routed.providerName}\u0000${routed.modelId}`)
+      && !triedDestinations.has(policyWireDestination(routed));
   } catch {
     // A route that fails to resolve (e.g. a redirect cycle) cannot succeed on retry; its terminal
     // error is rarely hop-worthy, so keep the fallback alive for the next eligible candidate.
@@ -108,6 +108,7 @@ async function shouldHopPolicyCandidate(response: Response, signal?: AbortSignal
   if (response.status < 400 || signal?.aborted) return false;
   // A response that must not be sent again cannot open a policy-candidate retry either.
   if (isNonReplayableResponse(response)) return false;
+  if (isPolicyCandidateRefusal(response)) return true;
   try {
     const inspected = await readBoundedResponseBody(response.clone(), { signal });
     const text = inspected.displaySafe ? inspected.text : "";
@@ -152,11 +153,13 @@ export async function handleResponsesWithPolicyFallback(
   deps: PolicyFallbackDeps = {},
 ): Promise<Response> {
   const runCore = deps.runCore ?? handleResponsesCore;
+  const policyScope: PolicyRequestScope = options.policyRequestScope ?? { triedDestinations: new Set() };
   let requestBodyReadNotified = false;
   let storedPool401ReplayDispatched = false;
   let rawBody: Record<string, unknown> | null = null;
   const coreOptions: CoreOptions = {
     ...options,
+    policyRequestScope: policyScope,
     openAiSidecarAuth: options.openAiSidecarAuth === undefined
       ? captureExplicitOpenAiCallerAuth(req.headers, config) : options.openAiSidecarAuth,
     nativeCallerAuth: options.nativeCallerAuth === undefined
@@ -196,31 +199,43 @@ export async function handleResponsesWithPolicyFallback(
     if (overload) return overload;
     throw error;
   }
-  const initialTrace = logCtx.routeDecision;
+  const initialTrace = policyScope.decision ?? logCtx.routeDecision;
   const initialRequestedModel = logCtx.requestedModel;
   if (!rawBody || !isPolicyDecision(initialTrace)) return response;
 
   const tried = new Set<string>([
     candidateKey({ provider: initialTrace.selected.provider, model: initialTrace.selected.model }),
   ]);
+  const selectedCandidate = initialTrace.selected.candidateIndex === undefined ? undefined
+    : initialTrace.candidates[initialTrace.selected.candidateIndex];
+  if (selectedCandidate) tried.add(candidateKey(selectedCandidate));
   // Redirect eligibility needs the full evaluation membership, not the bounded trace list.
-  const policyEligibility: ReadonlySet<string> = logCtx.policyEligibility
+  const policyEligibility: ReadonlySet<string> = policyScope.eligibility ?? logCtx.policyEligibility
     ?? new Set(initialTrace.candidates
       .filter(candidate => candidate.eligible)
       .map(candidate => candidateKey(candidate)));
+  policyScope.eligibility = policyEligibility;
+  policyScope.decision = initialTrace;
+  policyScope.triedDestinations.add(policyScope.preparedDestination ?? policyWireDestination({
+    providerName: initialTrace.selected.provider, modelId: initialTrace.selected.model,
+  }));
 
   while (!storedPool401ReplayDispatched && await shouldHopPolicyCandidate(response, req.signal)) {
     if (req.signal.aborted) return response;
     const next = rankPolicyFallbackCandidates(initialTrace, tried)
-      .find(candidate => staysWithinPolicyAfterRedirect(config, policyEligibility, candidate));
+      .find(candidate => staysWithinPolicyAfterRedirect(config, policyEligibility, candidate, policyScope.triedDestinations));
     if (!next) return response;
     tried.add(candidateKey(next));
 
     finishFailedPolicyAttempt(logCtx, response.status);
     const retryRequest = requestWithCandidate(req, rawBody, next);
+    delete policyScope.preparedDestination;
     try {
       try {
-        response = await runCore(retryRequest, config, logCtx, coreOptions);
+        const nextResponse = await runCore(retryRequest, config, logCtx, { ...coreOptions, policyFallbackCandidate: next });
+        // A locally skipped route has no upstream verdict to replace the last real failure.
+        if (!isPolicyCandidateRefusal(nextResponse)) response = nextResponse;
+        if (policyScope.preparedDestination) policyScope.triedDestinations.add(policyScope.preparedDestination);
       } catch (error) {
         const overload = requestPacingOverloadResponse(error);
         if (overload) return overload;
@@ -229,6 +244,7 @@ export async function handleResponsesWithPolicyFallback(
     } finally {
       logCtx.requestedModel = initialRequestedModel;
       logCtx.routeDecision = initialTrace;
+      logCtx.policyEligibility = policyEligibility;
     }
   }
 
