@@ -34,11 +34,13 @@ const JEV_DETAIL_TABS: readonly DetailTab[] = ["config", "stats", "about"];
  */
 const detailTabDomId = (tab: DetailTab) => `cws-detail-tab-${tab}`;
 const detailPanelDomId = (tab: DetailTab) => `cws-detail-panel-${tab}`;
+/** Stable default so an omitted combo list does not change identity every render. */
+const NO_COMBOS: readonly ComboItem[] = [];
 
 export function DetailPanel({
   apiBase,
   baseline,
-  combos = [],
+  combos = NO_COMBOS,
   isCreate = false,
   otherIds,
   otherAliases,

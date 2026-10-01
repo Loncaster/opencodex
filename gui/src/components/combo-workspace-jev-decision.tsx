@@ -119,11 +119,17 @@ export function ComboJevDecisionSection({
           ...(decisionTimeoutMs !== null ? { decisionTimeoutMs } : {}),
         }),
       });
+      if (!response.ok) {
+        // The management API reports refusals as { error }; anything else falls back to the status.
+        const failure = await response.json().catch(() => null) as Record<string, unknown> | null;
+        if (controller.signal.aborted) return;
+        setTest({ state: "error", message: failure && typeof failure.error === "string" ? failure.error : String(response.status) });
+        return;
+      }
       const data = await response.json().catch(() => null) as Record<string, unknown> | null;
       if (controller.signal.aborted) return;
-      if (!response.ok || !data || typeof data.gate !== "string") {
-        const message = data && typeof data.error === "string" ? data.error : String(response.status);
-        setTest({ state: "error", message });
+      if (!data || typeof data.gate !== "string") {
+        setTest({ state: "error", message: String(response.status) });
         return;
       }
       setTest({

@@ -215,14 +215,17 @@ export function TargetEditor({
         const advertisedReasoningEfforts = models.find(
           model => model.provider === row.provider && model.id === row.model,
         )?.reasoningEfforts;
-        const selectableReasoningEfforts = advertisedReasoningEfforts === undefined
+        const advertisedEffortSet = advertisedReasoningEfforts === undefined ? undefined : new Set(advertisedReasoningEfforts);
+        const selectableReasoningEfforts = advertisedEffortSet === undefined
           ? undefined
-          : COMBO_EFFORTS.filter(effort => advertisedReasoningEfforts.includes(effort));
+          : COMBO_EFFORTS.filter(effort => advertisedEffortSet.has(effort));
+        const selectableEffortSet = new Set(selectableReasoningEfforts ?? []);
         const selectedReasoningEfforts = selectableReasoningEfforts === undefined
           ? []
           : row.reasoningEfforts === undefined
             ? selectableReasoningEfforts
-            : row.reasoningEfforts.filter(effort => selectableReasoningEfforts.includes(effort));
+            : row.reasoningEfforts.filter(effort => selectableEffortSet.has(effort));
+        const selectedEffortSet = new Set(selectedReasoningEfforts);
         return (
           <div key={row.clientKey ?? `${row.provider}:${row.model}`} className="cwi-target-entry">
           <div
@@ -362,7 +365,7 @@ export function TargetEditor({
                     <fieldset className="cwi-jev-efforts">
                       <legend>{t("cws.jev.allowedEfforts")}</legend>
                       {selectableReasoningEfforts.map((effort) => {
-                        const checked = selectedReasoningEfforts.includes(effort);
+                        const checked = selectedEffortSet.has(effort);
                         return (
                           <label key={effort} className="cwi-jev-effort">
                             <input

@@ -18,9 +18,12 @@ import { COMBO_STRATEGY_HINT_KEYS, COMBO_TARGETS_HINT_KEYS } from "../combo-work
 import { clampedNumberInput, comboDraftErrorText } from "./combo-workspace-utils";
 import type { JevDecisionRow } from "../jev-decision-service";
 
+/** Stable default so an omitted combo list does not change identity every render. */
+const NO_COMBOS: readonly ComboItem[] = [];
+
 export function AddComboModal({
   apiBase,
-  combos = [],
+  combos = NO_COMBOS,
   existingIds,
   existingAliases,
   providerMap,
