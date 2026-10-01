@@ -322,6 +322,27 @@ env reference or foreign keychain entry makes it unusable). `allowLocalCleartext
 strings (Ollama requires them); under 2 or over 26 fail open locally (`no_choices`/`invalid`), unusable
 rows reuse `missing_key`, and `decisionTimeoutMs` (1000..120000) replaces the 4 s default.
 
+Decision backends. `src/combos/jev-dispatch.ts` derives the backend from the Combo and never stores
+it: `decisionModel` set means `model`, a `decisionProvider` other than `jev` means `systemone`, and
+neither means `typesafe`; setting both is a config error. The System One path is `src/combos/jev.ts`
+unchanged, so the TypeSafe request bytes stay pinned by `tests/fixtures/jev-typesafe-request-golden.json`.
+`src/combos/jev-model-backend.ts` asks an ordinary opencodex route for `{"choice":"<key>"}` over the
+same bounded state and option map, under the same deadline, bounds, and fail-open gates;
+`src/combos/jev-decision-contract.ts` holds the constants the GUI shares. The server glue
+`src/server/responses/jev-model-invoke.ts` runs that choice as a fresh internal `/v1/responses` turn
+with `tools: []`, its own send budget and turn lease, the parent's admission scope only, explicit null
+caller credentials, no caller headers or history, and a 64 KiB bounded response; it is flagged
+`internalDecisionCall`, which `src/server/responses/request-prepare.ts` uses to keep caller-scoped
+memory and shadow-call rewrites off the decision turn and to refuse JEV Combo reentry. Save-time
+recursion and route checks live in
+`src/server/management/decision-model-validation.ts` (a decision model may not resolve, after Fast
+or effort selector normalization, to its own Combo, any JEV Combo, or a `jev-decision` row; a provider
+PATCH cannot turn a referenced row into one). `src/server/management/decision-routes.ts` serves
+`POST /api/combos/decision-test`, one synthetic two-option probe of a saved or unsaved method, and
+`GET /api/combos/decision-discovery`, read-only System One and catalog hints built by
+`src/server/management/decision-discovery.ts`. Persisted decisions carry an optional `backend`, and
+the usage aggregate reports per-backend counts and latency with older rows as `unknown`.
+
 `src/combos/jev.ts` extracts bounded user-task, previous-assistant, and latest-tool-output text plus
 the tool name and boolean signals; raw image data, tool arguments, encrypted reasoning, headers, and
 the JEV credential are excluded. It owns the joint target/effort choice map, strict response
@@ -347,7 +368,9 @@ call. Each target may carry an optional non-empty `reasoningEfforts` allowlist. 
 backward-compatible all-advertised behavior; a present list is intersected with current capabilities,
 and an empty intersection removes that target from the JEV choice map rather than broadening it.
 Direct models and every other Combo strategy bypass this path. The shared Combo editor owns the GUI
-checkboxes and `Create JEV Auto` template; no second model picker or JEV-only editor exists.
+checkboxes and `Create JEV Auto` template. Inside that editor, a JEV Combo's `Decision method`
+section (`gui/src/components/combo-workspace-jev-decision.tsx`) chooses TypeSafe, a System One row,
+or an opencodex model route, with the timeout and a Test probe; there is no separate decisions page.
 
 JEV setup stays inside those existing shells. A configured `jev-decision` provider Overview exposes
 **Create JEV Auto**, which navigates to the registered `models/combos/jev-auto` action hash.

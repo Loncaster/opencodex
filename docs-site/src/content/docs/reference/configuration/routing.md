@@ -147,6 +147,7 @@ namespace, and cannot use reserved bare native families such as `gpt-*`, `o1-*`,
 | `nativeAlias?` | `boolean` | `false` | Let a currently supported bare native id take precedence only for that unqualified id. Bare `gpt-5.6-*` ids use Codex Pool/Direct credentials. Account-qualified routes remain distinct. Provider-qualified routes such as `openai-apikey/gpt-5.6-*` use their configured API-key route and never fall through to the native alias. |
 | `displayName?` | `string` | — | Display-only catalog label, required and non-empty for a native alias. |
 | `decisionProvider?` | `string` | `"jev"` | `strategy: "jev"` only. `"jev"` (the same as omitting it, and stored as omission) is the TypeSafe decision service, valid without a provider row; any other value must name a configured provider with `adapter: "jev-decision"` whose `baseUrl` ends in `/systemone`. |
+| `decisionModel?` | `string` | unset | `strategy: "jev"` only, mutually exclusive with `decisionProvider`. An ordinary opencodex route (for example `ollama/qwen3:4b`) asked to pick one offered option as JSON. It runs with the selected provider's stored credentials, never the caller's, and cannot resolve to this combo, any JEV combo, or a `jev-decision` row. |
 | `decisionTimeoutMs?` | `number` | `4000` | `strategy: "jev"` only. Decision deadline before failing open, 1000–120000 ms. |
 
 ```json
@@ -169,14 +170,14 @@ namespace, and cannot use reserved bare native families such as `gpt-*`, `o1-*`,
 For strategy behavior, retryable failures, cooldowns, encrypted v2 task limits, and management
 commands, see [Combos](/guides/combos/).
 
-The `jev` strategy is optional and, unless `decisionProvider` names a self-hosted decision service,
-requires the canonical `jev` provider credential. That provider
+The `jev` strategy is optional. Only the TypeSafe method, used when neither `decisionProvider` nor
+`decisionModel` is set, requires the canonical `jev` provider credential. That provider
 is a decision service, publishes no directly routable model, and cannot be a Combo target. JEV sees
 only currently eligible members of `targets`; missing, failed, or invalid decisions use the first
 eligible member, while caller cancellation remains terminal. Adding the provider or Combo never
 changes `defaultProvider` or hides direct model rows. See
-[JEV: decision-guided first pick](/guides/combos/#jev-decision-guided-first-pick) for setup, privacy
-bounds, and the one-decision-per-call contract.
+[Decision method](/guides/combos/#decision-method) for the three methods, setup, privacy bounds, and
+the one-decision-per-call contract.
 
 ### Self-hosted decision model (e.g. Ollama tev1)
 
