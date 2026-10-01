@@ -2,6 +2,8 @@
   "version": 1,
   "root": "tests",
   "explicit": {
+    "main-account-hard-lock-thresholds.test.ts": "codex-integration",
+    "main-account-external-usage.test.ts": "codex-integration",
     "claude-devin-output-order.test.ts": "claude-integration",
     "codex-config-preservation.test.ts": "codex-integration",
     "codex-credits.test.ts": "codex-integration",

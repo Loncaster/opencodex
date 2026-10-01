@@ -598,3 +598,8 @@ Cursor Claude Fast pricing applies the published Fast tuples to Opus 4.8, Opus 5
 Explicit `-fast` model IDs use the Fast tuple directly; a Cursor variant tier outcome applies
 the same 2x multiplier to a base model estimate. Opus 4.7 remains standard-priced because its
 upstream Fast mode is unavailable. Configured model prices retain precedence over compiled rows.
+
+Main-account protection copy uses the effective short/long thresholds from the server projection.
+The main account card and setting render an amber advisory for possible usage outside opencodex,
+including when the admission policy is off; warning detection and expiry belong to
+[main-account observations](providers/openai-accounts.md#main-account-policy-observations).

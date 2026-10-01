@@ -25,6 +25,9 @@ import {
  */
 
 export interface MainAccountHardLockStatus {
+  thresholds?: { short: number; long: number };
+  window?: "short" | "long";
+  externalUsage?: { window: "short" | "long"; fromPercent: number; toPercent: number; observedAt: number };
   enabled: boolean;
   state: "off" | "unknown" | "ready" | "blocked";
   /** Server timestamp in milliseconds; not a client-side unlock instruction. */

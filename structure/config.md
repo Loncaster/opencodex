@@ -28,6 +28,12 @@ the [source-owned credential contract](codex-home.md#orca-source-owned-account-i
 
 ## Config surface
 
+`codexMainAccountHardLockThresholds` contains optional integer `short` and `long` percentages in
+80..100, defaulting to 90 and 98. The resolver forces short <= long for disk/in-memory input;
+malformed disk fields degrade individually. Settings PUT rejects invalid objects and effective
+short > long before mutation and rolls the field back on save failure. GET and PUT responses
+project effective thresholds through `mainAccountHardLock.thresholds`.
+
 `src/config/schema/compaction-recovery.ts` strictly validates opt-in `compactionRecovery`; invalid disk values disable it with a warning, while candidate writes reject them. `src/config/schema/blocked-model-redirects.ts` applies the same read-degrade/write-reject boundary to malformed `blockedModelRedirects` maps. The [failure-only contract](transports/responses-failover.md) leaves provider identity, accounts and client compaction unchanged.
 
 `skills.catalog_refresh` in the proxy JSON configuration accepts `per_session` (the runtime default when absent) or `per_turn`. The former retains received skills instructions for a conversation; the latter passes through the current catalog. This is separate from Codex's `skills.include_instructions` TOML switch and does not change the live dashboard probe. See the [Responses snapshot contract](transports/responses.md#responses-httpsse).
@@ -516,7 +522,7 @@ described in [Responses transport](transports/responses.md), not upstream policy
 
 ## Codex Pool low-quota protection
 
-`codexPool.lowQuotaProtection` is opt-in, requires a 1–100 threshold and a selected action/window when enabled, covers pool accounts only and is independent of proactive switching and the main account’s 98% hard lock. `src/codex/low-quota-protection.ts` pauses in live `pausedCodexAccountIds` before selection, then coalesces a deferred config save with bounded retry and shutdown flush. Fresh accepted observations reach `src/codex/low-quota-observer.ts`; credits-only and expired windows do not act. Manual resume suppresses repause across currently qualifying window episodes; a new reset boundary or below-threshold reading re-arms the policy, but never automatically resumes an account. A timed-out in-flight save remains pending until its eventual success or failure; queued work is cancelled at owner close. An unsuccessful save does not survive restart. The default alert is log-and-API only and records `logged`, not notification delivery.
+`codexPool.lowQuotaProtection` is opt-in, requires a 1–100 threshold and a selected action/window when enabled, covers pool accounts only and is independent of proactive switching and the main account’s per-window hard lock. `src/codex/low-quota-protection.ts` pauses in live `pausedCodexAccountIds` before selection, then coalesces a deferred config save with bounded retry and shutdown flush. Fresh accepted observations reach `src/codex/low-quota-observer.ts`; credits-only and expired windows do not act. Manual resume suppresses repause across currently qualifying window episodes; a new reset boundary or below-threshold reading re-arms the policy, but never automatically resumes an account. A timed-out in-flight save remains pending until its eventual success or failure; queued work is cancelled at owner close. An unsuccessful save does not survive restart. The default alert is log-and-API only and records `logged`, not notification delivery.
 
 ## Management-backed CLI commands need a management plane
 
