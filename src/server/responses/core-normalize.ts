@@ -42,7 +42,7 @@ import { applyXaiOauthFastModel, xaiOauthFastModelForDecision } from "../../prov
 
 /** Preview the billed xAI lane without mutating request state or resolving credentials. */
 export function previewXaiOauthWireModel(
-  parsed: OcxParsedRequest,
+  parsed: { options: Pick<OcxParsedRequest["options"], "serviceTier"> },
   route: RouteResult,
   config: OcxConfig,
   inboundWire: InboundWire,

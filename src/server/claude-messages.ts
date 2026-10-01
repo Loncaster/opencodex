@@ -72,6 +72,7 @@ import { clientWireOf } from "./inference/client-wire";
 import { directEncodersApply } from "./inference/client-encoder-delivery";
 import type { ClientEncoderOption } from "./responses/core-options";
 import { handleResponses } from "./responses";
+import { previewXaiOauthWireModel } from "./responses/core-normalize";
 import { upstreamWireForAdapter } from "../protocols/contract";
 import { createProtocolEnvelope, type ProtocolEnvelope } from "../protocols/envelope";
 import { featuresFromMessagesBody, type ProtocolFeature } from "../protocols/features";
@@ -1046,17 +1047,19 @@ async function handleClaudeMessagesWithBudget(
   };
   try {
     const route = routeModel(config, internalBody.model as string, evidenceFromBody(internalBody));
-    // Same reason as the native Chat lane: this route can be sent from here, so
-    // the key's scope is applied before the wire is settled.
-    assertRouteAllowedByScope(
-      resolveAdmissionModelScope(config, logIds?.admission),
-      String(internalBody.model ?? ""),
-      route,
-    );
     // Settle the wire once so the sampling decision below reads the effective
     // adapter rather than the provider-wide default (#404).
     route.staticPolicy = captureRouteStaticPolicy(
       route.providerName, route.modelId, route.provider, route.staticPolicy.effectiveAlias, "anthropic",
+    );
+    // Keep native dispatch scoped while translated xAI OAuth requests preview
+    // the same billed Fast lane as their final Responses scope check.
+    assertRouteAllowedByScope(
+      resolveAdmissionModelScope(config, logIds?.admission),
+      String(internalBody.model ?? ""),
+      { providerName: route.providerName, modelId: previewXaiOauthWireModel({ options: {
+        serviceTier: typeof internalBody.service_tier === "string" ? internalBody.service_tier : undefined,
+      } }, route, config, "anthropic") },
     );
     route.provider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider, "anthropic", route.staticPolicy);
     logCtx.routeDecision = route.routeDecision;

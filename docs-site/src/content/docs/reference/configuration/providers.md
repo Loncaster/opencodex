@@ -733,6 +733,7 @@ For an opencodex API key with `allowedModels`, OAuth Fast requests require
 `xai/grok-4.7-build-fast` (or its bare model id). Allowing only `xai/grok-4.7` does not authorize
 the Fast lane. A key allowing only the Fast wire model can use Fast; plain requests or disabled
 Fast still require `xai/grok-4.7`. Provider restrictions continue to apply.
+These rules apply to Responses, Chat Completions, Messages, and routed compaction requests.
 
 xAI charges Priority Processing at 2× the standard token price for input, output, cached, and
 reasoning tokens; cache discounts are applied before the multiplier. Cost estimates use that premium
