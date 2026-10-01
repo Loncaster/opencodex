@@ -167,6 +167,12 @@ async function handleWorkflowBudgetRoutesOnDemand(ctx: ManagementContext): Promi
   return handleWorkflowBudgetRoutes(ctx);
 }
 
+async function handleCodexAgentRoleRoutesOnDemand(ctx: ManagementContext): Promise<Response | null> {
+  if (!pathInManagementNamespace(ctx.url.pathname, "/api/codex-agent-roles")) return null;
+  const { handleCodexAgentRoleRoutes } = await import("./management/codex-agent-role-routes");
+  return handleCodexAgentRoleRoutes(ctx);
+}
+
 /**
  * Lazy like the Lab and routing-profile handlers: the protocol planner reaches the router and
  * the ingress eligibility rules, which no other dashboard request needs.
@@ -337,6 +343,7 @@ export async function handleManagementAPI(
     ??     (await handleQuotaResetRoutesOnDemand(ctx))
     ??     (await handleLowQuotaRoutesOnDemand(ctx))
     ??     (await handleWorkflowBudgetRoutesOnDemand(ctx))
+    ??     (await handleCodexAgentRoleRoutesOnDemand(ctx))
     ??     (await handleProtocolRoutesOnDemand(ctx))
     ??     (await handleGrokCouponRoutesOnDemand(ctx))
     ??     (await handleAnthropicResetGrantRoutesOnDemand(ctx))
