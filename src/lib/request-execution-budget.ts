@@ -325,10 +325,11 @@ function createRequestExecutionBudgetWithLedger(
       const isAlternateTarget = changesTarget || intent.sendClass === "account-failover"
         || intent.sendClass === "combo-failover";
       const chargesTransition = changesTarget && intent.rebasedTarget !== true;
+      const chargesAlternateTarget = isAlternateTarget && intent.rebasedTarget !== true;
       if (isAlternateTarget && chargesTransition && targetTransitions >= policy.maxTargetTransitions) {
         return { allowed: false, reason: "target-transition-exhausted" };
       }
-      if (isAlternateTarget && alternateTargetSends >= policy.maxAlternateTargetSends) {
+      if (chargesAlternateTarget && alternateTargetSends >= policy.maxAlternateTargetSends) {
         return { allowed: false, reason: "alternate-target-exhausted" };
       }
 
@@ -358,7 +359,7 @@ function createRequestExecutionBudgetWithLedger(
       counter.spent += 1;
       if (intent.countedExternally === true) counter.pendingExternalSends += 1;
       if (drawsReserve) reserveSpent = true;
-      if (isAlternateTarget && intent.rebasedTarget !== true) alternateTargetSends += 1;
+      if (chargesAlternateTarget) alternateTargetSends += 1;
       if (chargesTransition) targetTransitions += 1;
       lastTargetKey = intent.targetKey;
 
@@ -395,7 +396,7 @@ function createRequestExecutionBudgetWithLedger(
             counter.spent -= 1;
             observer?.refund();
             if (drawsReserve) reserveSpent = false;
-            if (isAlternateTarget && intent.rebasedTarget !== true) alternateTargetSends -= 1;
+            if (chargesAlternateTarget) alternateTargetSends -= 1;
             if (chargesTransition) targetTransitions -= 1;
             lastTargetKey = previousTargetKey;
           },

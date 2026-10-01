@@ -30,6 +30,8 @@ credential rebuild retargeting the request to another region's canonical host â€
 `rebasedTarget`. The physical destination is still recorded, but the move consumes neither the
 single target transition nor the alternate-target allowance: it was authorized work, not a failover
 decision, and the endpoint fallback keeps ownership of the one transition it may still need.
+Admission, reservation and refund use the same alternate-target charging predicate. A validated
+rebase remains eligible after that allowance is spent, while replay safety and the total-send cap still apply.
 
 The hop pays for a replay that some *other* layer dispatches, so which layer settles the
 reservation follows the dispatcher, not the ladder. A helper-routed replay reports the same
