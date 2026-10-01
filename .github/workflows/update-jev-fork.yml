@@ -1,0 +1,110 @@
+name: Update JEV fork
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * *'
+
+permissions: {}
+
+concurrency:
+  group: update-jev-fork
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event.repository.fork && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.release.outputs.changed }}
+      branch: ${{ steps.release.outputs.branch }}
+      base: ${{ steps.release.outputs.base }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Select latest stable upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PATCH_COMMIT: 6585bae510b45da4ea525f173c405a11da4bf6dd
+        run: |
+          set -euo pipefail
+          tag=$(gh api repos/lidge-jun/opencodex/releases/latest --jq .tag_name)
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo '::error::Unexpected stable release tag'; exit 1; }
+          branch="jev-release/$tag"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          if test -n "$(git ls-remote --heads origin "refs/heads/$branch")"; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo "Release $tag already has a validated fork branch." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git fetch --depth=2 origin "$PATCH_COMMIT"
+          git fetch --depth=1 https://github.com/lidge-jun/opencodex.git "refs/tags/$tag"
+          base=$(git rev-parse 'FETCH_HEAD^{commit}')
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          git switch -c release-candidate "$base"
+          git -c user.name='Fork update' -c user.email='fork-update@example.test' cherry-pick "$PATCH_COMMIT" || {
+            echo '::error::JEV patch conflicts with the upstream release; resolve it manually. Nothing was published.'
+            exit 1
+          }
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+      - name: Setup project Bun
+        if: steps.release.outputs.changed == 'true'
+        uses: ./.github/actions/setup-project-bun
+      - name: Validate and assemble package
+        if: steps.release.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun run test -- tests/routing/jev-decision.test.ts tests/providers/jev-provider.test.ts tests/server/server-jev-combo-e2e.test.ts tests/providers/provider-outbound.test.ts tests/providers/provider-outbound-private-network.test.ts tests/server/bounded-body.test.ts tests/routing/destination-policy-resolved.test.ts
+          bun run privacy:scan
+          bun run structure:check
+          (cd docs-site && bun install --frozen-lockfile && bun run build)
+          bun run build:gui
+          npm pack --pack-destination "$RUNNER_TEMP"
+          git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
+          git bundle create "$RUNNER_TEMP/jev-update.bundle" release-candidate "^${{ steps.release.outputs.base }}"
+          echo "Validated source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.release.outputs.changed == 'true'
+        with:
+          name: validated-jev-release
+          path: |
+            ${{ runner.temp }}/jev-update.bundle
+            ${{ runner.temp }}/source-commit.txt
+            ${{ runner.temp }}/*.tgz
+          retention-days: 30
+          if-no-files-found: error
+
+  publish-source:
+    needs: validate
+    if: needs.validate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # No candidate scripts execute with the write credential.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: validated-jev-release
+          path: ${{ runner.temp }}/validated
+      - name: Publish validated source branch
+        env:
+          BRANCH: ${{ needs.validate.outputs.branch }}
+          BASE: ${{ needs.validate.outputs.base }}
+        run: |
+          set -euo pipefail
+          git check-ref-format "refs/heads/$BRANCH"
+          git fetch --depth=1 https://github.com/lidge-jun/opencodex.git "$BASE"
+          git bundle verify "$RUNNER_TEMP/validated/jev-update.bundle"
+          git fetch "$RUNNER_TEMP/validated/jev-update.bundle" release-candidate
+          expected=$(cat "$RUNNER_TEMP/validated/source-commit.txt")
+          test "$(git rev-parse FETCH_HEAD)" = "$expected"
+          git push origin "FETCH_HEAD:refs/heads/$BRANCH"
+          echo "Published $BRANCH at $expected. No package registry publish or machine installation was performed." >> "$GITHUB_STEP_SUMMARY"
