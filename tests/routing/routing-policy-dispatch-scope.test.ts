@@ -2,17 +2,19 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { OcxConfig } from "../../src/types";
+import type { OcxConfig, OcxUsage } from "../../src/types";
 import { createTranslatorBudget } from "../../src/lib/translator-budget";
 import { handleResponsesWithPolicyFallback, type PolicyFallbackDeps } from "../../src/server/responses/policy-fallback";
 import { prepareResponsesRequest } from "../../src/server/responses/request-prepare";
 import type { ResponsesAdmissionState } from "../../src/server/responses/core-options";
-import { beginRequestAttempt, type RequestLogContext } from "../../src/server/request-log";
+import { addFinalRequestLog, beginRequestAttempt, noteAttemptSend, type RequestLogContext, type RequestLogEntry } from "../../src/server/request-log";
 import { releaseUpstreamHostAdmission } from "../../src/codex/upstream-host-health";
 import * as subagentFallback from "../../src/codex/subagent-model-fallback";
 import * as recovery from "../../src/server/responses/agent-task-recovery";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
 import { closeRequestHistoryIndex } from "../../src/routing/history/indexer";
+import { routeModel } from "../../src/router";
+import { PolicyCandidateUnavailableError, policyCandidateRefusalResponse } from "../../src/server/responses/policy-request-scope";
 
 const originalFetch = globalThis.fetch;
 let home: string;
@@ -57,7 +59,10 @@ function configFor(ids = ["a", "b", "c", "d"]): OcxConfig {
 
 /** Exercise the real parser, route selection, subagent recovery, normalization and auth preparation.
  * Only physical dispatch is replaced, so no fixture can fall through to a real provider. */
-async function execute(config: OcxConfig, options: { spawn?: boolean; failures?: number; selector?: string } = {}) {
+async function execute(config: OcxConfig, options: {
+  spawn?: boolean; failures?: number; selector?: string;
+  onDispatch?: (context: RequestLogContext) => void;
+} = {}) {
   const destinations: string[] = [];
   const selectors: string[] = [];
   const scopes: Array<ReadonlySet<string> | undefined> = [];
@@ -82,6 +87,7 @@ async function execute(config: OcxConfig, options: { spawn?: boolean; failures?:
       ctx.attempts!.push(attempt);
       ctx.activeAttempt = attempt;
       ctx.activeAttemptStartedAt = Date.now();
+      options.onDispatch?.(ctx);
       return destinations.length <= (options.failures ?? 1)
         ? Response.json({ error: { type: "rate_limit_error", message: "fixture busy" } }, { status: 429 })
         : Response.json({ status: "completed" });
@@ -246,5 +252,120 @@ describe("policy scope through real request preparation", () => {
     expect(result.destinations).toEqual(["a/model"]);
     expect(result.response.status).toBe(429);
     expect((await result.response.json()).error.message).toBe("fixture busy");
+  });
+
+  test("a locally refused wire duplicate preserves the actual failure's final log and settlement", async () => {
+    const config = configFor(["b"]);
+    config.providers["openai-apikey"] = {
+      adapter: "openai-responses", baseUrl: "https://api.openai.com/v1", authMode: "key", apiKey: "fixture-key",
+      models: ["gpt-5.6-sol-pro", "gpt-5.6-sol"],
+    };
+    config.routingProfiles!.daily.candidates = [
+      { provider: "openai-apikey", model: "gpt-5.6-sol-pro" },
+      { provider: "b", model: "model" },
+      { provider: "openai-apikey", model: "gpt-5.6-sol" },
+    ];
+    const fallback = spyOn(subagentFallback, "applySubagentModelFallback").mockImplementation(parsed => {
+      if (parsed.modelId !== "b/model") return null;
+      parsed.modelId = "openai-apikey/gpt-5.6-sol";
+      return { from: "b/model", to: parsed.modelId };
+    });
+    restoreSpies.push(() => fallback.mockRestore());
+    const usage: OcxUsage = { inputTokens: 17, outputTokens: 3 };
+    const settled: Array<OcxUsage | undefined> = [];
+    const tracker = { settle: (value: OcxUsage | undefined) => { settled.push(value); } };
+    const result = await execute(config, { spawn: true, onDispatch: context => {
+      context.usage = usage;
+      context.usageFromBridge = true;
+      context.upstreamError = "fixture busy";
+      context.terminalHttpStatus = 429;
+      context.terminalSource = "upstream";
+      context.spendTracker = tracker;
+      noteAttemptSend(context.activeAttempt, 17);
+    } });
+    expect(result.destinations).toEqual(["openai-apikey/gpt-5.6-sol"]);
+    expect(result.selectors).toEqual(["policy/daily", "b/model"]);
+    expect(result.response.status).toBe(429);
+    expect(result.log).toMatchObject({
+      model: "gpt-5.6-sol-pro", provider: "openai-apikey", usage,
+      usageFromBridge: true, upstreamError: "fixture busy", terminalHttpStatus: 429,
+    });
+    expect(result.log.activeAttempt).toBe(result.log.attempts?.[0]);
+    expect(result.log.spendTracker).toBe(tracker);
+    const rows: RequestLogEntry[] = [];
+    addFinalRequestLog("policy-skipped-duplicate", Date.now(), result.log, result.response.status, undefined, row => rows.push(row));
+    expect(settled).toEqual([usage]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      provider: "openai-apikey", model: "gpt-5.6-sol-pro", usage, totalTokens: 20,
+      upstreamError: "fixture busy", status: 429, spend: { sends: 1, settled: 1, unresolved: 0 },
+    });
+    expect(rows[0]?.attempts).toHaveLength(1);
+    expect(rows[0]?.attempts?.[0]).toMatchObject({ provider: "openai-apikey", model: "gpt-5.6-sol", usage, status: 429, sendCount: 1 });
+  });
+
+  test.each(["all-skipped", "skip-then-success", "failure-then-skip"])("local refusal log rollback keeps physical attempts (%s)", async scenario => {
+    const config = configFor(["a", "b", "c"]);
+    const initial = routeModel(config, "policy/daily");
+    const log: RequestLogContext = { model: "", provider: "", attempts: [] };
+    const settled: Array<OcxUsage | undefined> = [];
+    const tracker = { settle: (usage: OcxUsage | undefined) => { settled.push(usage); } };
+    let lastResponse: Response | undefined;
+    let lastUsage: OcxUsage | undefined;
+    const sent: string[] = [];
+    const response = await handleResponsesWithPolicyFallback(new Request("http://localhost/v1/responses", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "policy/daily", input: "hello" }),
+    }), config, log, {}, { runCore: async (req, _config, context, options) => {
+      const body = await req.json() as { model: string };
+      options.onRequestBodyParsed?.(body);
+      context.routeDecision = initial.routeDecision;
+      context.policyEligibility = initial.policyEligibility;
+      const provider = body.model === "policy/daily" ? "a" : body.model.split("/")[0]!;
+      const skip = provider !== "a" && (scenario === "all-skipped"
+        || provider === (scenario === "skip-then-success" ? "b" : "c"));
+      if (skip) {
+        // Preparation may replace top-level state and attach a fresh, unused tracker.
+        Object.assign(context, { provider, model: "skipped-model", usage: { inputTokens: 999 },
+          requestedAlias: "skipped-alias", localTerminalReason: "skipped-candidate", errorCode: "skipped-code",
+          terminalSource: "synthetic", spendTracker: { settle: () => { throw new Error("settled an unsent candidate"); } },
+        });
+        return policyCandidateRefusalResponse(new PolicyCandidateUnavailableError())!;
+      }
+      expect(context.activeAttempt).toBeUndefined();
+      expect(context.usage).toBeUndefined();
+      expect(context.localTerminalReason).toBeUndefined();
+      sent.push(provider);
+      context.provider = provider;
+      context.model = `served-${provider}`;
+      const attempt = beginRequestAttempt(sent.length, provider, context.model, "test");
+      context.attempts!.push(attempt);
+      context.activeAttempt = attempt;
+      context.activeAttemptStartedAt = Date.now();
+      noteAttemptSend(attempt, 10);
+      lastUsage = { inputTokens: 10 * sent.length, outputTokens: sent.length };
+      context.usage = lastUsage;
+      context.spendTracker = tracker;
+      context.terminalSource = "upstream";
+      const status = provider === "c" ? 200 : provider === "b" ? 503 : 429;
+      if (status !== 200) context.upstreamError = `busy-${provider}`;
+      lastResponse = Response.json(status === 200 ? { status: "completed" } : { error: { message: `busy-${provider}` } }, { status });
+      return lastResponse;
+    } });
+    const expected = scenario === "all-skipped" ? ["a"] : ["a", scenario === "skip-then-success" ? "c" : "b"];
+    expect(sent).toEqual(expected);
+    expect(response).toBe(lastResponse!);
+    expect(log.activeAttempt).toBe(log.attempts?.at(-1));
+    expect(log).toMatchObject({ provider: expected.at(-1), model: `served-${expected.at(-1)}`, usage: lastUsage });
+    for (const key of ["requestedAlias", "localTerminalReason", "errorCode"] as const) expect(Object.hasOwn(log, key)).toBe(false);
+    const rows: RequestLogEntry[] = [];
+    addFinalRequestLog("policy-skipped-candidate", Date.now(), log, response.status, undefined, row => rows.push(row));
+    expect(settled).toEqual([lastUsage]);
+    expect(rows[0]).toMatchObject({ provider: expected.at(-1), model: `served-${expected.at(-1)}`, usage: lastUsage,
+      status: response.status, spend: { sends: expected.length, settled: expected.length, unresolved: 0 },
+    });
+    expect(rows[0]?.attempts?.map(attempt => attempt.provider)).toEqual(expected);
+    expect(rows[0]?.attempts?.every(attempt => attempt.sendCount === 1 && attempt.usage !== undefined)).toBe(true);
+    expect(rows[0]?.upstreamError).toBe(scenario === "skip-then-success" ? undefined : `busy-${expected.at(-1)}`);
   });
 });

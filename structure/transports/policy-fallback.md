@@ -11,8 +11,10 @@ original evaluation, including eligible destinations omitted from the bounded di
 Normal virtual-model wire mapping remains attached to its admitted selector and does not add a new
 eligible model. Policy traversal records settled physical destinations and skips a destination already
 attempted through another candidate or redirect; same-target credential and transient retries retain
-their existing budgets. Local skips preserve the last upstream failure. The initial decision remains
-the selection evidence while physical attempts record execution.
+their existing budgets. Local skips preserve the last upstream failure and its log context, including
+route identity, usage, active attempt and spend tracker; preparation-only fields are discarded.
+Completed physical attempt rows remain intact, and final logging settles the last actual send's usage.
+The initial decision remains the selection evidence while physical attempts record execution.
 
 Cancellation, non-replayable responses and committed output keep the
 [shared replay boundaries](responses-failover.md). A local policy refusal is identified by its

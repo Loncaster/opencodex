@@ -227,14 +227,23 @@ export async function handleResponsesWithPolicyFallback(
     if (!next) return response;
     tried.add(candidateKey(next));
 
+    // Retain the failed response's log owner until a candidate actually replaces it. This is
+    // deliberately shallow: completed attempts and the live spend tracker keep their identity.
+    const failureLog = { ...logCtx };
     finishFailedPolicyAttempt(logCtx, response.status);
     const retryRequest = requestWithCandidate(req, rawBody, next);
     delete policyScope.preparedDestination;
     try {
       try {
         const nextResponse = await runCore(retryRequest, config, logCtx, { ...coreOptions, policyFallbackCandidate: next });
-        // A locally skipped route has no upstream verdict to replace the last real failure.
-        if (!isPolicyCandidateRefusal(nextResponse)) response = nextResponse;
+        // A locally skipped route owns neither the returned failure nor its usage/settlement.
+        // Preparation can replace route metadata and the tracker, or add fields absent before it.
+        if (isPolicyCandidateRefusal(nextResponse)) {
+          for (const key of Object.keys(logCtx)) {
+            if (!Object.hasOwn(failureLog, key)) Reflect.deleteProperty(logCtx, key);
+          }
+          Object.assign(logCtx, failureLog);
+        } else response = nextResponse;
         if (policyScope.preparedDestination) policyScope.triedDestinations.add(policyScope.preparedDestination);
       } catch (error) {
         const overload = requestPacingOverloadResponse(error);
