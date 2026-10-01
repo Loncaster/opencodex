@@ -40,6 +40,10 @@ const EFFORT_LABEL: Record<EffortIntent, TKey> = {
   exhaustive: "integrations.lazycodexRoles.auto.effortExhaustive",
 };
 
+function alreadySet(p: RoleProposal): boolean {
+  return p.proposedModel === p.model && (p.proposedEffort == null || p.proposedEffort === p.effort);
+}
+
 export default function LazyCodexRoleAutoAssign({
   apiBase,
   busy,
@@ -78,8 +82,6 @@ export default function LazyCodexRoleAutoAssign({
     }
   };
 
-  const alreadySet = (p: RoleProposal) =>
-    p.proposedModel === p.model && (p.proposedEffort == null || p.proposedEffort === p.effort);
   const applicable = (result?.proposals ?? []).filter(p =>
     p.status === "proposed" && p.proposedModel && !applied[p.role] && !alreadySet(p));
 
@@ -93,6 +95,7 @@ export default function LazyCodexRoleAutoAssign({
     setApplying(true);
     let count = 0;
     const total = applicable.length;
+    // react-doctor-disable-next-line react-doctor/async-await-in-loop -- sequential on purpose: every PUT rewrites the shared omo.jsonc mirror
     for (const proposal of applicable) if (await applyOne(proposal)) count += 1;
     setSummary(t("integrations.lazycodexRoles.auto.appliedCount", { count: String(count), total: String(total) }));
     setApplying(false);

@@ -106,8 +106,23 @@ describe("POST /api/codex-agent-roles/auto-assign", () => {
     expect((result.body.proposals as any[]).every(p => p.status === "unsized")).toBe(true);
     answer = { text: "", error: "role sizing HTTP 502: boom" };
     result = await call("/api/codex-agent-roles/auto-assign", { method: "POST", body: "{}" });
-    expect(result.body.sizingError).toBe("role sizing HTTP 502: boom");
+    expect(result.body.sizingError).toBe("HTTP 502");
     expect((result.body.proposals as any[]).find(p => p.role === "worker").reason).toContain("the sizing call failed");
+  });
+
+  test("a failed sizing call never echoes upstream text or exception messages", async () => {
+    const leaks = [
+      "role sizing HTTP 500: /Users/someone/.codex/auth.json account=acct_123 key=sk-live-abc",
+      "connect ECONNREFUSED while opening /Users/someone/secret.sock for acct_123",
+    ];
+    for (const error of leaks) {
+      answer = { text: "", error };
+      const result = await call("/api/codex-agent-roles/auto-assign", { method: "POST", body: "{}" });
+      const serialized = JSON.stringify(result.body);
+      expect(serialized).not.toContain("/Users/someone");
+      expect(serialized).not.toContain("acct_123");
+      expect(serialized).not.toContain("sk-live-abc");
+    }
   });
 
   test("refuses without a sizing model and never calls one", async () => {

@@ -21,6 +21,20 @@ export type CompleteRoleSizing = (call: RoleSizingCall, config: OcxConfig) => Pr
 const SIZING_TIMEOUT_MS = 180_000;
 const MAX_SIZING_RESPONSE_BYTES = 1024 * 1024;
 
+/**
+ * The completion error can carry upstream response text and exception messages, which may
+ * include paths, account identifiers or secrets the redactor does not recognise. Only a fixed
+ * category, plus a bare HTTP status, leaves the management response and the CLI.
+ */
+export function publicSizingError(error: string): string {
+  const http = /^[\w .-]* HTTP (\d{3}):/.exec(error);
+  if (http) return `HTTP ${http[1]}`;
+  if (error.endsWith("response exceeded byte bound")) return "the response was too large";
+  if (error.endsWith("returned non-JSON")) return "the response was not JSON";
+  if (error.endsWith("returned no text")) return "the response had no text";
+  return "the request could not be completed";
+}
+
 async function completeThroughProxy(call: RoleSizingCall, config: OcxConfig) {
   const { postLocalChatCompletion } = await import("../../lib/local-chat-completion");
   return postLocalChatCompletion({
@@ -115,8 +129,8 @@ export async function proposeCodexRoleModels(options: {
     }, options.config);
     const names = inputs.map(input => input.role);
     if (answer.error) {
-      sizingError = answer.error;
-      for (const role of names) outcomes.set(role, { unsized: `the sizing call failed: ${answer.error}` });
+      sizingError = publicSizingError(answer.error);
+      for (const role of names) outcomes.set(role, { unsized: `the sizing call failed: ${sizingError}` });
     } else {
       for (const [role, outcome] of sizing.parseRoleSizingResponse(answer.text, names)) outcomes.set(role, outcome);
     }
