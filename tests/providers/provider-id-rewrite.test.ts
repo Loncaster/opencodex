@@ -35,6 +35,22 @@ test("rewrites every routed-string site", () => {
   expect(config.disabledModels).toContain("anthropic/claude-sonnet-5");
 });
 
+test("rewrites a decisionModel provider prefix while preserving model and synthetic suffixes", () => {
+  const config: OcxConfig = { port: 10100, defaultProvider: TO, providers: {
+    [TO]: { adapter: "openai-chat", baseUrl: "https://provider.example/v1" },
+  }, combos: {
+    auto: { strategy: "jev", targets: [{ provider: TO, model: "target" }], decisionModel: `${FROM}/judge--fast` },
+    foreign: { strategy: "jev", targets: [{ provider: TO, model: "target" }], decisionModel: `${FROM}-extra/judge` },
+    trimmed: { strategy: "jev", targets: [{ provider: TO, model: "target" }], decisionModel: ` ${FROM}/judge--high ` },
+    clear: { strategy: "jev", targets: [{ provider: TO, model: "target" }], decisionModel: null },
+  } };
+  expect(rewriteProviderReferences(config, FROM, TO)).toEqual({ changed: 2, collisions: [] });
+  expect(config.combos?.auto?.decisionModel).toBe(`${TO}/judge--fast`);
+  expect(config.combos?.foreign?.decisionModel).toBe(`${FROM}-extra/judge`);
+  expect(config.combos?.clear?.decisionModel).toBeNull();
+  expect(config.combos?.trimmed?.decisionModel).toBe(`${TO}/judge--high`);
+});
+
 test("moves a providerContextCaps entry by key, not by prefix", () => {
   const config = { providerContextCaps: { [FROM]: 500_000, anthropic: 200_000 } } as unknown as OcxConfig;
   expect(rewriteProviderReferences(config, FROM, TO)).toEqual({ changed: 1, collisions: [] });

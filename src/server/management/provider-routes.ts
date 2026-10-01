@@ -1494,7 +1494,11 @@ export async function handleProviderRoutes(ctx: ManagementContext): Promise<Resp
     // or baseUrl edit could fail the combo's load-time checks and get it salvaged away on the
     // next reload. Disabling the row stays allowed (not editorTouched; runtime fails open).
     const decisionDependent = () => Object.values(config.combos ?? {})
-      .some(combo => typeof combo.decisionProvider === "string" && combo.decisionProvider.trim() === name);
+      .some(combo => (typeof combo.decisionProvider === "string" && combo.decisionProvider.trim() === name)
+        || (typeof combo.decisionModel === "string" && combo.decisionModel.trim().startsWith(`${name}/`)));
+    const { decisionModelProviderPatchError } = await import("./decision-model-validation");
+    const decisionModelError = applied.editorTouched ? decisionModelProviderPatchError(config, name, next) : null;
+    if (decisionModelError) return jsonResponse({ error: decisionModelError }, 400);
     if (applied.editorTouched && !pacingOnly) {
       const providerError = canonicalBudgetOnly
         ? canonicalOpenAiBudgetPatchError(next, rawBody, keys, config)
@@ -1577,6 +1581,8 @@ export async function handleProviderRoutes(ctx: ManagementContext): Promise<Resp
       // A PATCH that managed headers owns the resulting block: the clear path restores
       // registry static headers, so exact-match stripping must not erase them again.
       const candidate = replay.headersTouched ? replay.next : stripRegistryOnlyStaticHeaders(name, replay.next);
+      const decisionModelError = replay.editorTouched ? decisionModelProviderPatchError(config, name, candidate) : null;
+      if (decisionModelError) { replayError = decisionModelError; return; }
       const pinsTouched = Object.hasOwn(rawBody, "pinnedReasoningEffort") || Object.hasOwn(rawBody, "modelPinnedReasoningEfforts");
       if (pinsTouched || (replay.editorTouched && !pacingOnly && decisionDependent())) {
         const validation = validateConfigCandidate({ ...config, providers: { ...config.providers, [name]: candidate } });

@@ -1,4 +1,6 @@
 {
+  "jev-decision-model-config.test.ts": "routing",
+  "cli-combo-partial-update.test.ts": "cli",
   "claude-devin-output-order.test.ts": "claude-integration",
   "codex-config-preservation.test.ts": "codex-integration",
     "codex-credits.test.ts": "codex-integration",
@@ -757,6 +759,8 @@
   "debug-settings.test.ts": "server",
   "debug.test.ts": "lib",
   "decision-discovery.test.ts": "server",
+  "server-jev-model-decision-e2e.test.ts": "server",
+  "decision-routes.test.ts": "server",
   "deepinfra-provider.test.ts": "providers",
   "deepseek-inbound-wire.test.ts": "providers",
   "deepseek-reasoning-replay-gaps.test.ts": "providers",
@@ -957,6 +961,7 @@
   "jev-decision-destination.test.ts": "routing",
   "jev-decision-provider-combo.test.ts": "routing",
   "jev-typesafe-golden.test.ts": "routing",
+  "jev-model-backend.test.ts": "routing",
   "jev-provider.test.ts": "providers",
   "keyring-smoke.test.ts": "ci-workflows",
   "kilo-client.test.ts": "clients",

@@ -1,7 +1,7 @@
 import { isCodexReasoningEffort } from "../reasoning-effort";
 import { SUPPORTED_NATIVE_OPENAI_SLUGS } from "../codex/catalog/native-models";
 import type { OcxComboConfig, OcxComboCooldownWaitPolicy, OcxComboDefaultEffort, OcxComboDefaultEffortMode, OcxComboReasoningEffortMode, OcxComboStrategy, OcxComboTarget, OcxProviderConfig } from "../types";
-import { COMBO_NAMESPACE, isValidComboId, targetKey } from "./identifiers";
+import { COMBO_NAMESPACE, isValidComboId, resolveComboId, targetKey } from "./identifiers";
 import {
   CANONICAL_JEV_DECISION_PROVIDER,
   JEV_DECISION_TIMEOUT_MAX_MS,
@@ -66,6 +66,8 @@ export interface NormalizedComboConfig {
   displayName: string | null;
   /** JEV decision service provider id; absent means the canonical `jev` service. */
   decisionProvider?: string;
+  /** Ordinary inference route used for JEV decisions. */
+  decisionModel?: string;
   /** JEV decision deadline override; absent keeps the default four-second deadline. */
   decisionTimeoutMs?: number;
   targets: NormalizedComboTarget[];
@@ -125,6 +127,8 @@ export interface ComboValidationOptions {
   requireUsableDecisionService?: boolean;
   /** Full combos map for alias uniqueness checks; omitted during early config load. */
   combos?: Record<string, OcxComboConfig>;
+  /** Ingress selector grammar, injected so combo validation never imports server routing. */
+  normalizeDecisionModel?: (model: string) => string;
   /** Combo being renamed — its stored alias is excluded from uniqueness checks. */
   excludeComboId?: string;
 }
@@ -314,6 +318,23 @@ export function comboConfigIssues(
       });
     }
   }
+  if (body.decisionModel !== undefined && body.decisionModel !== null) {
+    const model = typeof body.decisionModel === "string" ? body.decisionModel.trim() : "";
+    if (!model || model.length > JEV_MAX_CANDIDATE_FIELD_CHARS) {
+      issues.push({ path: ["decisionModel"], message: `decisionModel must be a non-empty string of at most ${JEV_MAX_CANDIDATE_FIELD_CHARS} characters` });
+    } else {
+      if (body.strategy !== "jev") {
+        issues.push({ path: ["decisionModel"], message: 'decisionModel is only valid with strategy "jev"' });
+      }
+      if (body.decisionProvider !== undefined && body.decisionProvider !== null) {
+        issues.push({ path: ["decisionModel"], message: "decisionModel cannot coexist with decisionProvider" });
+      }
+      const comboId = resolveComboId({ combos: options.combos }, options.normalizeDecisionModel?.(model) ?? model);
+      if (comboId === id || (comboId && options.combos?.[comboId]?.strategy === "jev")) {
+        issues.push({ path: ["decisionModel"], message: `decisionModel must not reference ${comboId === id ? "itself" : "a JEV combo"} (combo "${comboId}")` });
+      }
+    }
+  }
   if (body.decisionTimeoutMs !== undefined && body.decisionTimeoutMs !== null) {
     if (typeof body.decisionTimeoutMs !== "number" || !Number.isInteger(body.decisionTimeoutMs)
       || body.decisionTimeoutMs < JEV_DECISION_TIMEOUT_MIN_MS
@@ -450,6 +471,7 @@ export function normalizeComboConfig(raw: OcxComboConfig): NormalizedComboConfig
   const alias = typeof raw.alias === "string" ? raw.alias.trim() : "";
   const displayName = typeof raw.displayName === "string" ? raw.displayName.trim() : "";
   const decisionProvider = typeof raw.decisionProvider === "string" ? raw.decisionProvider.trim() : "";
+  const decisionModel = typeof raw.decisionModel === "string" ? raw.decisionModel.trim() : "";
   const defaultEffort = typeof raw.defaultEffort === "string" && isCodexReasoningEffort(raw.defaultEffort)
     ? raw.defaultEffort
     : null;
@@ -468,6 +490,7 @@ export function normalizeComboConfig(raw: OcxComboConfig): NormalizedComboConfig
     displayName: displayName || null,
     // Explicit "jev" is the default and stays sparse.
     ...(decisionProvider && decisionProvider !== CANONICAL_JEV_DECISION_PROVIDER ? { decisionProvider } : {}),
+    ...(decisionModel ? { decisionModel } : {}),
     ...(typeof raw.decisionTimeoutMs === "number" ? { decisionTimeoutMs: raw.decisionTimeoutMs } : {}),
     targets: raw.targets.map(target => ({
       provider: target.provider.trim(),
@@ -490,6 +513,7 @@ export function normalizeComboConfig(raw: OcxComboConfig): NormalizedComboConfig
  */
 export function comboDependsOnProvider(combo: OcxComboConfig, provider: string): boolean {
   if (combo.targets.some(target => target.provider === provider)) return true;
+  if (typeof combo.decisionModel === "string" && combo.decisionModel.trim().startsWith(`${provider}/`)) return true;
   const decisionProvider = typeof combo.decisionProvider === "string" ? combo.decisionProvider.trim() : "";
   return decisionProvider === provider && provider !== CANONICAL_JEV_DECISION_PROVIDER;
 }

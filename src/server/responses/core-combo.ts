@@ -32,7 +32,7 @@ import {
   comboFailureCooldownScope,
   JEV_PROVIDER_ID,
   jevDecisionBackendFor,
-  resolveJevDecision,
+  resolveJevComboDecision,
   type ComboPick,
   type JevCandidate,
   type JevDecision,
@@ -94,6 +94,7 @@ import { streamingContextOverflowResponse, jsonContextOverflowResponse } from ".
 import { mandatoryResponsesReasoningReplayUnavailable } from "./core-replay";
 import { settleOperatorReplacement } from "../../lib/upstream-retry";
 import { createComboProtocolLanes, dispatchNativeComboChild } from "./core-combo-native";
+import { createJevModelInvoker } from "./jev-model-invoke";
 import { clientWireOf } from "../inference/client-wire";
 
 /**
@@ -534,12 +535,23 @@ export async function executeComboResponses(
     const decisionStartedAt = Date.now();
     let decision: JevDecision;
     try {
-      decision = await resolveJevDecision({
+      decision = await resolveJevComboDecision({
         body,
         candidates: choices.map(choice => choice.candidate),
         fallback,
         config,
         ...(combo.decisionProvider ? { decisionProvider: combo.decisionProvider } : {}),
+        ...(combo.decisionModel
+          ? {
+            decisionModel: combo.decisionModel,
+            invokeModel: createJevModelInvoker({
+              req,
+              config,
+              options,
+              handleResponses: requestDispatchers.handleResponses,
+            }),
+          }
+          : {}),
         ...(combo.decisionTimeoutMs !== undefined ? { timeoutMs: combo.decisionTimeoutMs } : {}),
         signal: options.abortSignal,
       });

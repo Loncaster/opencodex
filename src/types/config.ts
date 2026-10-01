@@ -1348,7 +1348,9 @@ export interface OcxComboConfig {
    * row, such as a self-hosted Ollama `tev1` endpoint. That row's baseUrl is the full decision
    * endpoint and only its own apiKey is sent there.
    */
-  decisionProvider?: string;
+  decisionProvider?: string | null;
+  /** JEV only: an ordinary model route for decisions; null explicitly clears management input. */
+  decisionModel?: string | null;
   /**
    * `strategy: "jev"` only: decision deadline in milliseconds before failing open to the first
    * eligible target. Default 4000; range 1000..120000. Raise it for a self-hosted decision model

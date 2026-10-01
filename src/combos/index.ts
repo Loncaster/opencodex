@@ -73,3 +73,16 @@ export {
   type JevRouteOptionDescriptor,
   type ResolveJevDecisionOptions,
 } from "./jev";
+export {
+  buildJevModelPrompt,
+  JEV_MODEL_INSTRUCTIONS,
+  JEV_MODEL_MAX_OPTIONS,
+  JEV_MODEL_MAX_RESPONSE_TEXT_CHARS,
+  JevModelInvokeError,
+  parseJevModelChoice,
+  resolveJevModelDecision,
+  type JevModelInvoke,
+  type JevModelInvokeRequest,
+  type JevModelInvokeResult,
+} from "./jev-model-backend";
+export { resolveJevComboDecision, type ResolveJevComboDecisionOptions } from "./jev-dispatch";
