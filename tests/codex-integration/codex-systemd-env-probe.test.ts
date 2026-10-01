@@ -67,6 +67,17 @@ for (const offline of [false, true]) describe(`systemd home decoding (${offline 
     expect(result.claims[0]?.homes).toEqual({ codexHome: "/fixture/.codex", opencodexHome: null });
   });
 
+  test("comment backslashes and an escaped trailing backslash do not continue a directive", () => {
+    writeFileSync(unitPath, [
+      "[Service]", "# ignored \\", "; ignored \\", "Description=literal\\\\",
+      "Environment=CODEX_HOME=/fixture/.codex",
+    ].join("\n"));
+    const result = inspectServiceManagerInstallation(probe());
+    expect(result.kind).toBe("present");
+    if (result.kind !== "present") return;
+    expect(result.claims[0]?.homes.codexHome).toBe("/fixture/.codex");
+  });
+
   test.each([
     ["unknown escape", 'Environment="CODEX_HOME=/fixture/\\q"'],
     ["unsupported tab escape", 'Environment="CODEX_HOME=/fixture/\\t"'],
@@ -81,14 +92,17 @@ for (const offline of [false, true]) describe(`systemd home decoding (${offline 
     ["empty home", 'Environment=CODEX_HOME='],
     ["reset assignment", 'Environment='],
     ["missing assignment separator", 'Environment="CODEX_HOME"'],
+    ["continued directive name", 'Environment\\\n="CODEX_HOME=/foreign"'],
+    ["continued directive across comments", 'Environment\\\n# ignored\n; ignored\n="CODEX_HOME=/foreign"'],
+    ["continuation consuming a home assignment", 'ExecStart=/fixture/bin/ocx \\\nEnvironment="CODEX_HOME=/fixture/.codex"'],
   ])("%s makes the whole definition unknown despite another matching home", (_, malformed) => {
     const homes = { codexHome: "/fixture/.codex", opencodexHome: "/fixture/.opencodex" };
     const statePath = join(testHome, "service-state.json");
     writeFileSync(statePath, JSON.stringify({ version: 1, ...homes }));
     writeFileSync(unitPath, `[Service]\nEnvironment="OPENCODEX_HOME=${homes.opencodexHome}"\n${malformed}\n`);
-    expect(inspectServiceManagerInstallation(probe()).kind).toBe("unknown");
     expect(inspectNativeCodexOwnership({
       ...probe(), statePaths: [statePath], currentHomes: homes, realpathSync: path => path,
     }).ownership).toBe("unknown");
+    expect(inspectServiceManagerInstallation(probe()).kind).toBe("unknown");
   });
 });

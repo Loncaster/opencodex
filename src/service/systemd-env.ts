@@ -28,6 +28,11 @@ export function parseSystemdUnitHomes(body: string): SystemdHomeParse {
   const homes: SystemdHomes = { codexHome: null, opencodexHome: null };
   for (const rawLine of body.split(/\r?\n/)) {
     const line = rawLine.trim();
+    if (!line || /^[#;]/.test(line)) continue;
+    // systemd folds physical continuations before recognizing directive names. The writer never
+    // emits them; accepting individual lines could hide an override or invent a home assignment.
+    const trailingBackslashes = /\\+$/.exec(rawLine)?.[0].length ?? 0;
+    if (trailingBackslashes % 2 === 1) return { kind: "invalid" };
     if (!/^Environment(?:\s|=|$)/.test(line)) continue;
     const directive = /^Environment\s*=\s*(.*)$/.exec(line);
     if (!directive) return { kind: "invalid" };

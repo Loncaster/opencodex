@@ -83,6 +83,8 @@ Systemd home parsing in `src/service/systemd-env.ts` decodes the generated quote
 doubled percent signs, with legacy simple bare assignments retained. Unknown escapes, unresolved
 specifiers, malformed quotes, resets and duplicate home assignments make the whole definition
 unknown in both online and offline probes; they never become omitted homes for ownership comparison.
+Non-comment physical line continuations also make the definition unknown before directive matching;
+the generated format uses single physical lines, while systemd otherwise folds continuations first.
 On Windows, the generated-wrapper check accepts package installs that invoke the source CLI.
 A standalone wrapper that invokes `start` directly must carry the generated protocol and runtime
 markers, one quoted `OCX_BUN` assignment, and no `OCX_CLI` assignment in either quoting form.
