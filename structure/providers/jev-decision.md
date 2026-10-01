@@ -37,7 +37,8 @@ same bounded state and option map, under the same deadline, bounds, and fail-ope
 `src/combos/jev-decision-contract.ts` holds the constants the GUI shares. The server glue
 `src/server/responses/jev-model-invoke.ts` runs that choice as a fresh internal `/v1/responses` turn
 with `tools: []`, its own send budget and turn lease, the parent's admission scope only, explicit null
-caller credentials, no caller headers or history, and a 64 KiB bounded response; it is flagged
+caller credentials, no caller headers or history, a 1024-token `max_output_tokens` ceiling that
+also sizes the spend reservation, and a 64 KiB bounded response; it is flagged
 `internalDecisionCall`, which `src/server/responses/request-prepare.ts` uses to keep caller-scoped
 memory and shadow-call rewrites off the decision turn and to refuse JEV Combo reentry. Save-time
 recursion and route checks live in

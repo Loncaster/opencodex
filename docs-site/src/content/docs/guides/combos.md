@@ -442,7 +442,8 @@ request's `jevDecision`.
 
 `decisionTimeoutMs` applies to all three methods: an integer from 1000 to 120000 ms, default 4000.
 Requests and responses are bounded to 64 KiB. The candidate list is bounded to 64 targets; the
-model method also caps target/effort options at 64 and response text at 4096 characters. The
+model method also caps target/effort options at 64, response text at 4096 characters, and the
+decision turn's output at 1024 tokens. The
 System One row's 2–26 option limit applies as described above. A timeout or limit failure uses the
 first currently eligible target; it never expands the allowlist or retries the decision.
 

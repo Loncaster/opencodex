@@ -129,6 +129,8 @@ describe("JEV model decision backend through the combo runtime", () => {
     expect(decision.body.stream).toBe(true);
     expect(decision.body.store).toBe(false);
     expect(decision.body.tools).toEqual([]);
+    // A bounded answer: the decision turn never inherits an unbounded output budget.
+    expect(decision.body.max_output_tokens).toBe(1024);
     expect(JSON.stringify(decision.body)).toContain("luna/gpt-5.6-luna:high");
     expect(JSON.stringify(decision.body)).toContain("Refactor the parser");
     expect(JSON.stringify(decision.body)).not.toContain("exec_command");
@@ -194,4 +196,3 @@ describe("decision-model turn guard in request preparation", () => {
     expect(await response.text()).toContain("cannot be a JEV combo");
   });
 });
-

@@ -85,6 +85,13 @@ function decodeSse(bytes: Uint8Array): JevModelInvokeResult {
 }
 
 /**
+ * The answer is one short JSON object, so the decision turn carries its own output ceiling. It
+ * bounds billed output (including reasoning) and gives the spend reservation a nonzero ceiling;
+ * a truncated answer is malformed and fails open like any other bad reply.
+ */
+export const JEV_MODEL_MAX_OUTPUT_TOKENS = 1024;
+
+/**
  * Build the invoker that runs one decision prompt as an internal Responses turn through the
  * normal router. The decision request is its own logical request: a fresh turn lease and send
  * budget, a detached log context whose spend tracker is settled here, and no caller credential
@@ -99,6 +106,7 @@ export function createJevModelInvoker(context: JevModelInvokerContext): JevModel
       instructions,
       input: [{ role: "user", content: [{ type: "input_text", text: input }] }],
       tools: [],
+      max_output_tokens: JEV_MODEL_MAX_OUTPUT_TOKENS,
     });
     if (new TextEncoder().encode(body).byteLength > JEV_MAX_REQUEST_BYTES) {
       throw new JevModelInvokeError("malformed", "decision request too large");
