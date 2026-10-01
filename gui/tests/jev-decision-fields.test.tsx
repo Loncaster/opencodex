@@ -147,10 +147,11 @@ test("a keyless self-hosted decision row creates JEV Auto with itself as the dec
 
   const dialog = host.querySelector<HTMLDialogElement>('dialog[data-combo-preset="jev-auto"]');
   expect(dialog).not.toBeNull();
+  // The deep-linked row selects the System One method; the select lists only server rows.
+  expect(host.querySelector("#cwi-new-decision-method-systemone")?.getAttribute("aria-pressed")).toBe("true");
   const service = host.querySelector<HTMLSelectElement>("#cwi-new-decision-provider")!;
   expect(service.value).toBe("tev-local");
   expect([...service.options].map(option => [option.value, option.textContent, option.disabled])).toEqual([
-    ["", "TypeSafe JEV (default)", false],
     ["tev-local", "tev-local", false],
     // A disabled decision row is listed with its reason but cannot be picked.
     ["tev-off", "tev-off (disabled)", true],
@@ -232,13 +233,15 @@ test("the overview names each JEV combo's service; the editor clears it and hide
   expect(service.value).toBe("tev-local");
   expect(host.querySelector<HTMLInputElement>("#cwi-edit-decision-timeout")!.value).toBe("30000");
 
-  await act(async () => { setSelect(service, ""); });
-  expect(service.value).toBe("");
+  // Switching to TypeSafe is a method choice; the server select goes away with it.
+  await act(async () => { host.querySelector<HTMLButtonElement>("#cwi-edit-decision-method-typesafe")!.click(); });
+  expect(host.querySelector("#cwi-edit-decision-provider")).toBeNull();
+  expect(host.querySelector("#cwi-edit-decision-method-typesafe")?.getAttribute("aria-pressed")).toBe("true");
   await act(async () => { setInput(host.querySelector<HTMLInputElement>("#cwi-edit-decision-timeout")!, ""); });
   expect(host.textContent).toContain("The hosted TypeSafe decision service");
   await act(async () => { host.querySelector<HTMLButtonElement>("#cwi-edit-save")!.click(); });
   await flush();
-  expect(saved.at(-1)).toMatchObject({ decisionProvider: null, decisionTimeoutMs: null });
+  expect(saved.at(-1)).toMatchObject({ decisionProvider: null, decisionModel: null, decisionTimeoutMs: null });
 
   const failover = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')]
     .find(candidate => candidate.textContent?.trim() === "Failover")!;
@@ -296,6 +299,8 @@ test("a stored decision service that is gone stays selected with its reason and 
   expect(stored.textContent).toBe("gone (not configured)");
   expect(stored.disabled).toBe(false);
   expect(service.getAttribute("aria-invalid")).toBe("true");
+  expect(service.getAttribute("aria-describedby"))
+    .toBe("cwi-edit-decision-provider-hint cwi-edit-decision-provider-issue");
   expect(host.querySelector("#cwi-edit-decision-provider-issue")?.textContent)
     .toBe("Decision service gone can't be used (not configured). Choose another service or TypeSafe JEV.");
 
@@ -344,5 +349,84 @@ test("a deep link naming an unusable decision row falls back to TypeSafe", async
   await flush(6);
 
   expect(host.querySelector('dialog[data-combo-preset="jev-auto"]')).not.toBeNull();
-  expect(host.querySelector<HTMLSelectElement>("#cwi-new-decision-provider")?.value).toBe("");
+  expect(host.querySelector("#cwi-new-decision-provider")).toBeNull();
+  expect(host.querySelector("#cwi-new-decision-method-typesafe")?.getAttribute("aria-pressed")).toBe("true");
+});
+
+test("the model method saves an opencodex route and refuses this combo's own selector", async () => {
+  const { createRoot } = await import("react-dom/client");
+  const host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  const jevCombo: ComboItem = {
+    id: "tev-auto",
+    model: "router",
+    alias: "router",
+    nativeAlias: false,
+    displayName: null,
+    strategy: "jev",
+    stickyLimit: 1,
+    defaultEffort: null,
+    targets: [{ provider: "openai", model: "gpt-6-astra", clientKey: "t1" }],
+  };
+  const coding: ComboItem = {
+    id: "coding",
+    model: "combo/coding",
+    alias: null,
+    nativeAlias: false,
+    displayName: null,
+    strategy: "failover",
+    stickyLimit: 1,
+    defaultEffort: null,
+    targets: [{ provider: "openai", model: "gpt-5.6-sol", clientKey: "t2" }],
+  };
+  const saved: ComboItem[] = [];
+
+  await act(async () => {
+    root!.render(
+      <LanguageProvider>
+        <ComboWorkspace
+          combos={[jevCombo, coding]}
+          providerQuotaStates={{}}
+          providers={providers}
+          models={models}
+          loading={false}
+          onRefresh={() => {}}
+          onSave={async (item) => { saved.push(item); return { ok: true }; }}
+          onRemove={async () => ({ ok: true })}
+          onAdd={() => {}}
+          adding={false}
+          onCloseAdd={() => {}}
+          onCreated={() => {}}
+        />
+      </LanguageProvider>,
+    );
+  });
+  await act(async () => { host.querySelector<HTMLButtonElement>('[data-decision-provider="jev"]')!.click(); });
+  await flush();
+
+  await act(async () => { host.querySelector<HTMLButtonElement>("#cwi-edit-decision-method-model")!.click(); });
+  expect(host.querySelector("#cwi-edit-decision-provider")).toBeNull();
+  const input = host.querySelector<HTMLInputElement>("#cwi-edit-decision-model")!;
+  expect(input.getAttribute("aria-describedby")).toBe("cwi-edit-decision-model-hint");
+  const routes = [...host.querySelectorAll<HTMLOptionElement>("#cwi-edit-decision-model-options option")]
+    .map(option => option.value);
+  // Enabled models and non-JEV combos are offered; this JEV combo's own selectors are not.
+  expect(routes).toContain("openai/gpt-6-astra");
+  expect(routes).toContain("combo/coding");
+  expect(routes).not.toContain("combo/tev-auto");
+  expect(routes).not.toContain("router");
+
+  await act(async () => { setInput(input, "openai/gpt-5.6-luna"); });
+  await act(async () => { host.querySelector<HTMLButtonElement>("#cwi-edit-save")!.click(); });
+  await flush();
+  expect(saved.at(-1)).toMatchObject({ decisionModel: "openai/gpt-5.6-luna", decisionProvider: null });
+
+  const count = saved.length;
+  await act(async () => { setInput(host.querySelector<HTMLInputElement>("#cwi-edit-decision-model")!, "router"); });
+  await act(async () => { host.querySelector<HTMLButtonElement>("#cwi-edit-save")!.click(); });
+  await flush();
+  expect(saved).toHaveLength(count);
+  expect(host.querySelector(".notice-err")?.textContent)
+    .toBe("Choose a decision model opencodex can route. It cannot be this combo or another JEV combo.");
 });

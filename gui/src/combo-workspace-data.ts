@@ -13,6 +13,8 @@ import {
   type JevDecisionIssue,
   type JevDecisionRow,
   jevDecisionRowIssue,
+  jevDecisionMethod,
+  jevDecisionModelForbidden,
 } from "./jev-decision-service";
 
 export { SUPPORTED_NATIVE_OPENAI_SLUGS };
@@ -165,6 +167,8 @@ export interface ComboItem {
   reasoningEffortMode?: "strict" | "adaptive";
   /** `jev` only: self-hosted decision provider id; null/omitted = canonical TypeSafe JEV. */
   decisionProvider?: string | null;
+  /** `jev` only: independently routed decision model; mutually exclusive with provider. */
+  decisionModel?: string | null;
   /** `jev` only: decision deadline in ms; null/omitted = the server default. */
   decisionTimeoutMs?: number | null;
   targets: ComboTarget[];
@@ -294,6 +298,7 @@ export function parseComboList(payload: unknown): ComboItem[] {
       }));
     }
     const decisionProvider = normalizeDecisionProvider(r.decisionProvider);
+    const decisionModel = normalizeAlias(r.decisionModel);
     const decisionTimeoutMs = normalizeDecisionTimeoutMs(r.decisionTimeoutMs);
     out.push({
       id,
@@ -310,6 +315,7 @@ export function parseComboList(payload: unknown): ComboItem[] {
       reasoningEffortMode: normalizeReasoningEffortMode(r.reasoningEffortMode),
       // Sparse like the wire: only a JEV combo that names a service or deadline carries them.
       ...(decisionProvider !== null ? { decisionProvider } : {}),
+      ...(decisionModel !== null ? { decisionModel } : {}),
       ...(decisionTimeoutMs !== null ? { decisionTimeoutMs } : {}),
       targets,
     });
@@ -483,6 +489,7 @@ export function draftEquals(a: ComboItem, b: ComboItem): boolean {
     // Only JEV sends these; another strategy keeps them in the draft for a switch back.
     || (a.strategy === "jev" && (
       (a.decisionProvider ?? null) !== (b.decisionProvider ?? null)
+      || (a.decisionModel ?? null) !== (b.decisionModel ?? null)
       || (a.decisionTimeoutMs ?? null) !== (b.decisionTimeoutMs ?? null)
     ))
   ) return false;
@@ -511,6 +518,7 @@ export function toPutBody(item: ComboItem, options: { renameFrom?: string } = {}
     nativeAlias?: true;
     displayName?: string;
     decisionProvider?: string | null;
+    decisionModel?: string | null;
     decisionTimeoutMs?: number | null;
   };
 } {
@@ -545,7 +553,8 @@ export function toPutBody(item: ComboItem, options: { renameFrom?: string } = {}
       // Other strategies omit both; the server drops stored values and rejects sent ones.
       ...(item.strategy === "jev"
         ? {
-            decisionProvider: normalizeDecisionProvider(item.decisionProvider),
+            decisionProvider: item.decisionModel != null ? null : normalizeDecisionProvider(item.decisionProvider),
+            decisionModel: item.decisionModel?.trim() || null,
             decisionTimeoutMs: item.decisionTimeoutMs ?? null,
           }
         : {}),
@@ -576,12 +585,15 @@ export type ComboDraftError =
   | "invalidModelProfile"
   | "invalidDecisionTimeout"
   | "invalidDecisionProvider"
+  | "invalidDecisionModel"
   | "noEnabledTarget";
 
 export function validateComboDraft(
   item: ComboItem,
   options: {
     existingIds: readonly string[];
+    combos?: readonly ComboItem[];
+    decisionModels?: readonly string[];
     /** Aliases already taken by OTHER combos (callers exclude the edited combo). */
     existingAliases?: readonly string[];
     isCreate: boolean;
@@ -661,7 +673,14 @@ export function validateComboDraft(
       || item.decisionTimeoutMs > JEV_DECISION_TIMEOUT_MAX_MS)) {
     return "invalidDecisionTimeout";
   }
-  if (item.strategy === "jev" && jevDecisionProviderIssue(item.decisionProvider, options.providers) !== null) {
+  if (item.strategy === "jev" && jevDecisionMethod(item) === "model") {
+    const route = item.decisionModel?.trim() ?? "";
+    if (!route || route.length > 512 || item.decisionProvider != null
+      || jevDecisionModelForbidden(route, options.combos ?? [], item)
+      || options.decisionModels && !options.decisionModels.includes(route)) return "invalidDecisionModel";
+  }
+  if (item.strategy === "jev" && jevDecisionMethod(item) === "systemone"
+    && (!item.decisionProvider?.trim() || jevDecisionProviderIssue(item.decisionProvider, options.providers) !== null)) {
     return "invalidDecisionProvider";
   }
 
@@ -764,14 +783,15 @@ export function jevDecisionServiceOptions(
 
 /** Read-only decision-service facts for a JEV combo, or null for other strategies. */
 export function jevDecisionSummary(
-  item: Pick<ComboItem, "strategy" | "decisionProvider" | "decisionTimeoutMs">,
+  item: Pick<ComboItem, "strategy" | "decisionProvider" | "decisionModel" | "decisionTimeoutMs">,
   providers: readonly { name: string; adapter?: string; baseUrl?: string }[],
-): { provider: string | null; baseUrl: string | null; timeoutMs: number | null } | null {
+): { provider: string | null; model: string | null; baseUrl: string | null; timeoutMs: number | null } | null {
   if (item.strategy !== "jev") return null;
   const provider = normalizeDecisionProvider(item.decisionProvider);
   const row = provider === null ? undefined : providers.find(candidate => candidate.name === provider);
   return {
     provider,
+    model: item.decisionModel?.trim() || null,
     baseUrl: row?.baseUrl?.trim() || null,
     timeoutMs: item.decisionTimeoutMs ?? null,
   };

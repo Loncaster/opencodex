@@ -5,15 +5,8 @@ import {
   COMBO_EFFORTS,
   COMBO_STRATEGIES,
   COMBO_STRATEGY_LABEL_KEYS,
-  JEV_DECISION_ISSUE_LABEL_KEYS,
-  jevDecisionServiceOptions,
   newComboTarget,
 } from "../combo-workspace-data";
-import {
-  JEV_DECISION_TIMEOUT_DEFAULT_MS,
-  JEV_DECISION_TIMEOUT_MAX_MS,
-  JEV_DECISION_TIMEOUT_MIN_MS,
-} from "../jev-decision-service";
 import { IconArrowDown, IconArrowUp, IconGrip, IconPlus, IconTrash } from "../icons";
 import { useT } from "../i18n/shared";
 import { Switch } from "../ui";
@@ -150,103 +143,6 @@ export function ComboCapabilities({
         />
       </div>
     </section>
-  );
-}
-
-/** JEV-only decision service and deadline; callers render it only for `strategy: "jev"`. */
-export function JevDecisionFields({
-  idPrefix,
-  providers,
-  decisionProvider,
-  decisionTimeoutMs,
-  disabled,
-  onChange,
-}: {
-  idPrefix: string;
-  providers: ProviderOption[];
-  decisionProvider: string | null;
-  decisionTimeoutMs: number | null;
-  disabled?: boolean;
-  onChange: (patch: { decisionProvider?: string | null; decisionTimeoutMs?: number | null }) => void;
-}) {
-  const t = useT();
-  const options = jevDecisionServiceOptions(providers, decisionProvider);
-  const selected = options.find(option => option.id === decisionProvider) ?? options[0]!;
-  return (
-    <>
-      <div className="cwi-field">
-        <label htmlFor={`${idPrefix}-decision-provider`}>{t("cws.jev.decisionService")}</label>
-        <select
-          id={`${idPrefix}-decision-provider`}
-          className="input"
-          value={selected.id ?? ""}
-          disabled={disabled}
-          aria-describedby={selected.issue
-            ? `${idPrefix}-decision-provider-hint ${idPrefix}-decision-provider-issue`
-            : `${idPrefix}-decision-provider-hint`}
-          aria-invalid={selected.issue ? true : undefined}
-          onChange={(e) => onChange({ decisionProvider: e.target.value || null })}
-        >
-          {options.map(option => (
-            // An unusable row stays visible with its reason; only the stored one stays selectable.
-            <option
-              key={option.id ?? ""}
-              value={option.id ?? ""}
-              disabled={option.issue !== undefined && option.id !== selected.id}
-            >
-              {option.id === null
-                ? t("cws.jev.decisionServiceDefault")
-                : option.issue
-                  ? `${option.id} (${t(JEV_DECISION_ISSUE_LABEL_KEYS[option.issue])})`
-                  : option.id}
-            </option>
-          ))}
-        </select>
-        <p id={`${idPrefix}-decision-provider-hint`} className="muted" style={{ fontSize: 12, margin: "8px 0 0", overflowWrap: "anywhere" }}>
-          {selected.id === null ? t("cws.jev.decisionServiceDefaultHint") : t("cws.jev.decisionServiceHint")}
-          {selected.baseUrl && <> <code>{selected.baseUrl}</code></>}
-        </p>
-        {selected.id !== null && selected.issue && (
-          <p id={`${idPrefix}-decision-provider-issue`} className="muted" style={{ fontSize: 12, margin: "4px 0 0", color: "var(--danger, #b42318)" }}>
-            {t("cws.err.invalidDecisionProvider", {
-              name: selected.id,
-              reason: t(JEV_DECISION_ISSUE_LABEL_KEYS[selected.issue]),
-            })}
-          </p>
-        )}
-      </div>
-      <div className="cwi-field">
-        <label htmlFor={`${idPrefix}-decision-timeout`}>{t("cws.jev.decisionTimeout")}</label>
-        <input
-          id={`${idPrefix}-decision-timeout`}
-          className="input mono"
-          type="number"
-          inputMode="numeric"
-          min={JEV_DECISION_TIMEOUT_MIN_MS}
-          max={JEV_DECISION_TIMEOUT_MAX_MS}
-          step={1}
-          placeholder={String(JEV_DECISION_TIMEOUT_DEFAULT_MS)}
-          value={decisionTimeoutMs ?? ""}
-          disabled={disabled}
-          aria-describedby={`${idPrefix}-decision-timeout-hint`}
-          onChange={(e) => {
-            if (e.target.value === "") {
-              onChange({ decisionTimeoutMs: null });
-              return;
-            }
-            const value = Number(e.target.value);
-            if (Number.isFinite(value)) onChange({ decisionTimeoutMs: value });
-          }}
-        />
-        <p id={`${idPrefix}-decision-timeout-hint`} className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>
-          {t("cws.jev.decisionTimeoutHint", {
-            default: JEV_DECISION_TIMEOUT_DEFAULT_MS,
-            min: JEV_DECISION_TIMEOUT_MIN_MS,
-            max: JEV_DECISION_TIMEOUT_MAX_MS,
-          })}
-        </p>
-      </div>
-    </>
   );
 }
 

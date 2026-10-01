@@ -127,6 +127,7 @@ describe("combo-workspace-data", () => {
         reasoningEffortMode: "adaptive",
         alias: "jev-auto",
         decisionProvider: null,
+        decisionModel: null,
         decisionTimeoutMs: null,
       },
     });

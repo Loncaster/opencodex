@@ -12,12 +12,15 @@ import { IconX } from "../icons";
 import { useT } from "../i18n/shared";
 import { Notice } from "../ui";
 import type { ModelOption, ProviderOption } from "./combo-workspace-types";
-import { ComboCapabilities, EffortSelect, JevDecisionFields, StrategySeg, TargetEditor } from "./combo-workspace-controls";
+import { ComboCapabilities, EffortSelect, StrategySeg, TargetEditor } from "./combo-workspace-controls";
+import { ComboJevDecisionSection } from "./combo-workspace-jev-decision";
 import { COMBO_STRATEGY_HINT_KEYS, COMBO_TARGETS_HINT_KEYS } from "../combo-workspace-data";
 import { clampedNumberInput, comboDraftErrorText } from "./combo-workspace-utils";
 import type { JevDecisionRow } from "../jev-decision-service";
 
 export function AddComboModal({
+  apiBase,
+  combos = [],
   existingIds,
   existingAliases,
   providerMap,
@@ -28,6 +31,9 @@ export function AddComboModal({
   onClose,
   onSubmit,
 }: {
+  apiBase?: string;
+  /** Existing combos; a JEV decision model may not name the new combo or any JEV combo. */
+  combos?: readonly ComboItem[];
   existingIds: string[];
   existingAliases: string[];
   providerMap: Readonly<Record<string, JevDecisionRow>>;
@@ -81,6 +87,7 @@ export function AddComboModal({
     const code = validateComboDraft(draft, {
       existingIds,
       existingAliases,
+      combos,
       isCreate: true,
       providers: providerMap,
     });
@@ -182,10 +189,15 @@ export function AddComboModal({
             </p>
           </div>
           {draft.strategy === "jev" && (
-            <JevDecisionFields
+            <ComboJevDecisionSection
               idPrefix="cwi-new"
+              apiBase={apiBase}
+              combo={draft}
+              combos={combos}
               providers={providers}
+              models={models}
               decisionProvider={draft.decisionProvider ?? null}
+              decisionModel={draft.decisionModel ?? null}
               decisionTimeoutMs={draft.decisionTimeoutMs ?? null}
               disabled={busy}
               onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}

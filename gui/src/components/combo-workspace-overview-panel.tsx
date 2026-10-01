@@ -75,11 +75,14 @@ export function OverviewPanel({
                 type="button"
                 className="cwi-attention-row"
                 style={{ flexWrap: "wrap" }}
-                data-decision-provider={decision.provider ?? "jev"}
+                data-decision-provider={decision.model ? undefined : decision.provider ?? "jev"}
+                data-decision-model={decision.model ?? undefined}
                 onClick={() => onSelect(item.id)}
               >
                 <code className="chip">{item.model}</code>
-                <span>{decision.provider ?? t("cws.jev.decisionServiceDefault")}</span>
+                {decision.model
+                  ? <span>{t("cws.jev.method.model")}: <code>{decision.model}</code></span>
+                  : <span>{decision.provider ?? t("cws.jev.decisionServiceDefault")}</span>}
                 {decision.baseUrl && <code className="muted" style={{ overflowWrap: "anywhere" }}>{decision.baseUrl}</code>}
                 <span className="muted">
                   {decision.timeoutMs === null

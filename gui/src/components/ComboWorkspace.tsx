@@ -217,6 +217,7 @@ export default function ComboWorkspace({
             key={baseline.id}
             apiBase={apiBase}
             baseline={baseline}
+            combos={combos.filter((c) => c.id !== baseline.id)}
             otherIds={otherComboIds}
             otherAliases={otherComboAliases}
             providerMap={providerMap}
@@ -243,6 +244,7 @@ export default function ComboWorkspace({
         ) : creatingFirstCombo ? (
           <DetailPanel
             key="first-combo"
+            apiBase={apiBase}
             baseline={firstComboDraft}
             isCreate
             otherIds={[]}
@@ -276,6 +278,8 @@ export default function ComboWorkspace({
       {adding && (
         <AddComboModal
           key={`${addIntent ?? "blank"}:${addDraft?.decisionProvider ?? ""}`}
+          apiBase={apiBase}
+          combos={combos}
           existingIds={combos.map((c) => c.id)}
           existingAliases={existingComboAliases}
           providerMap={providerMap}

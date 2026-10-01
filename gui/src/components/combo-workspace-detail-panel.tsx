@@ -14,7 +14,8 @@ import { IconChevron, IconTrash } from "../icons";
 import { useT } from "../i18n/shared";
 import { Notice } from "../ui";
 import type { ModelOption, ProviderOption } from "./combo-workspace-types";
-import { ComboCapabilities, EffortSelect, JevDecisionFields, StrategySeg, TargetEditor } from "./combo-workspace-controls";
+import { ComboCapabilities, EffortSelect, StrategySeg, TargetEditor } from "./combo-workspace-controls";
+import { ComboJevDecisionSection } from "./combo-workspace-jev-decision";
 import { COMBO_STRATEGY_HINT_KEYS, COMBO_TARGETS_HINT_KEYS } from "../combo-workspace-data";
 import { clampedNumberInput, comboDraftErrorText } from "./combo-workspace-utils";
 import type { JevDecisionRow } from "../jev-decision-service";
@@ -37,6 +38,7 @@ const detailPanelDomId = (tab: DetailTab) => `cws-detail-panel-${tab}`;
 export function DetailPanel({
   apiBase,
   baseline,
+  combos = [],
   isCreate = false,
   otherIds,
   otherAliases,
@@ -53,6 +55,8 @@ export function DetailPanel({
   /** Management API target; without it the candidate path preview is not offered and JEV stats use same-origin paths. */
   apiBase?: string;
   baseline: ComboItem;
+  /** All OTHER combos; a JEV decision model may not name this combo or any JEV combo. */
+  combos?: readonly ComboItem[];
   isCreate?: boolean;
   /** Ids of all OTHER combos — rename collisions validate against these. */
   otherIds: string[];
@@ -95,7 +99,7 @@ export function DetailPanel({
   const [copied, setCopied] = useState(false);
   const dirty = !draftEquals(draft, baseline);
   const allTargetsExhausted = comboQuotaState(draft.targets, providerQuotaStates, providerMap) === "exhausted";
-  const baselineSyncKey = JSON.stringify([baseline.id, baseline.alias, baseline.nativeAlias, baseline.displayName, baseline.strategy, baseline.stickyLimit, baseline.defaultEffort, baseline.imageInput, baseline.reasoningEffortMode, baseline.decisionProvider, baseline.decisionTimeoutMs, baseline.targets.map(t => [t.provider, t.model, t.weight, t.reasoningEfforts, t.modelProfile])]);
+  const baselineSyncKey = JSON.stringify([baseline.id, baseline.alias, baseline.nativeAlias, baseline.displayName, baseline.strategy, baseline.stickyLimit, baseline.defaultEffort, baseline.imageInput, baseline.reasoningEffortMode, baseline.decisionProvider, baseline.decisionModel, baseline.decisionTimeoutMs, baseline.targets.map(t => [t.provider, t.model, t.weight, t.reasoningEfforts, t.modelProfile])]);
   const effortMap = useMemo(() => {
     const map = new Map<string, string[] | undefined>();
     for (const model of models) {
@@ -140,6 +144,7 @@ export function DetailPanel({
     const code = validateComboDraft(draft, {
       existingIds: otherIds,
       existingAliases: otherAliases,
+      combos,
       isCreate,
       providers: providerMap,
     });
@@ -158,7 +163,7 @@ export function DetailPanel({
       displayName,
       model: comboPublicModelId(trimmedId, alias),
       // The server keeps these only for JEV, so the saved baseline must not carry stale ones.
-      ...(draft.strategy === "jev" ? {} : { decisionProvider: null, decisionTimeoutMs: null }),
+      ...(draft.strategy === "jev" ? {} : { decisionProvider: null, decisionModel: null, decisionTimeoutMs: null }),
     };
     const renameFrom = !isCreate && trimmedId !== baseline.id ? baseline.id : undefined;
     try {
@@ -336,10 +341,15 @@ export function DetailPanel({
               </p>
             </div>
             {draft.strategy === "jev" && (
-              <JevDecisionFields
+              <ComboJevDecisionSection
                 idPrefix="cwi-edit"
+                apiBase={apiBase}
+                combo={draft}
+                combos={combos}
                 providers={providers}
+                models={models}
                 decisionProvider={draft.decisionProvider ?? null}
+                decisionModel={draft.decisionModel ?? null}
                 decisionTimeoutMs={draft.decisionTimeoutMs ?? null}
                 disabled={busy}
                 onChange={(patch) => updateDraft((d) => ({ ...d, ...patch }))}

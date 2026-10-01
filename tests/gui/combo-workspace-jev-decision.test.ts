@@ -10,6 +10,9 @@ import {
   JEV_DECISION_TIMEOUT_MAX_MS,
   JEV_DECISION_TIMEOUT_MIN_MS,
   canCreateJevAutoFrom,
+  jevDecisionMethod,
+  jevDecisionModelForbidden,
+  jevDecisionModelOptions,
   jevDecisionRowIssue,
 } from "../../gui/src/jev-decision-service";
 import {
@@ -166,11 +169,13 @@ describe("JEV decision service in the combo workspace", () => {
   test("the read-only summary names the service, its endpoint and timeout", () => {
     expect(jevDecisionSummary(parseOne({ strategy: "failover" }), providers)).toBeNull();
     expect(jevDecisionSummary(parseOne({ strategy: "jev" }), providers))
-      .toEqual({ provider: null, baseUrl: null, timeoutMs: null });
+      .toEqual({ provider: null, model: null, baseUrl: null, timeoutMs: null });
     expect(jevDecisionSummary(
       parseOne({ strategy: "jev", decisionProvider: "mytev", decisionTimeoutMs: 30000 }),
       providers,
-    )).toEqual({ provider: "mytev", baseUrl: "https://local.example/v1/systemone", timeoutMs: 30000 });
+    )).toEqual({ provider: "mytev", model: null, baseUrl: "https://local.example/v1/systemone", timeoutMs: 30000 });
+    expect(jevDecisionSummary(parseOne({ strategy: "jev", decisionModel: " a/m1 " }), providers))
+      .toEqual({ provider: null, model: "a/m1", baseUrl: null, timeoutMs: null });
   });
 
   test("JEV Auto pre-fills a self-hosted decision service and keeps TypeSafe by default", () => {
@@ -202,5 +207,106 @@ describe("JEV decision service in the combo workspace", () => {
     expect(jevAutoCreateDecisionProvider("#models/combos")).toBeUndefined();
     // The router keeps the query on this action link instead of stripping it.
     expect(resolveAppHashChange(hash)).toEqual({ page: "models", replaceTo: null });
+  });
+});
+
+describe("JEV decision model in the combo workspace", () => {
+  const jevRouter = parseComboList({
+    combos: [{ id: "router-combo", alias: "router", strategy: "jev", targets: [{ provider: "a", model: "m1" }] }],
+  })[0]!;
+  const coding = parseComboList({
+    combos: [{ id: "coding", strategy: "failover", targets: [{ provider: "a", model: "m1" }] }],
+  })[0]!;
+  const validate = (item: ComboItem, extra: { decisionModels?: readonly string[] } = {}) => validateComboDraft(item, {
+    existingIds: [],
+    isCreate: false,
+    providers: { a: {} },
+    combos: [jevRouter, coding],
+    ...extra,
+  });
+
+  test("decisionModel round-trips and replaces the decision provider on save", () => {
+    const parsed = parseOne({ strategy: "jev", decisionModel: " a/m1 ", decisionTimeoutMs: 8000 });
+    expect(parsed.decisionModel).toBe("a/m1");
+    expect(toPutBody(parsed).combo).toMatchObject({ decisionProvider: null, decisionModel: "a/m1", decisionTimeoutMs: 8000 });
+    // Both selectors set in a draft: the model wins and the provider is sent as an explicit clear.
+    expect(toPutBody({ ...parsed, decisionProvider: "mytev" }).combo).toMatchObject({ decisionProvider: null, decisionModel: "a/m1" });
+    // Without a model a JEV save still clears it explicitly, so switching back to a service sticks.
+    const service = toPutBody(parseOne({ strategy: "jev", decisionProvider: "mytev" })).combo;
+    expect(Object.hasOwn(service, "decisionModel")).toBe(true);
+    expect(service).toMatchObject({ decisionProvider: "mytev", decisionModel: null });
+    expect(Object.hasOwn(toPutBody({ ...parsed, strategy: "failover" }).combo, "decisionModel")).toBe(false);
+    expect(Object.hasOwn(parseOne({ strategy: "jev", decisionModel: "  " }), "decisionModel")).toBe(false);
+  });
+
+  test("a decisionModel change dirties a JEV draft only", () => {
+    const parsed = parseOne({ strategy: "jev", decisionModel: "a/m1" });
+    expect(draftEquals(parsed, { ...parsed, decisionModel: "a/m0" })).toBe(false);
+    expect(draftEquals(parsed, { ...parsed, decisionModel: null })).toBe(false);
+    const failover: ComboItem = { ...parsed, strategy: "failover" };
+    expect(draftEquals(failover, { ...failover, decisionModel: null })).toBe(true);
+  });
+
+  test("the method follows the stored selector", () => {
+    expect(jevDecisionMethod({})).toBe("typesafe");
+    expect(jevDecisionMethod({ decisionProvider: "jev" })).toBe("typesafe");
+    expect(jevDecisionMethod({ decisionProvider: "mytev" })).toBe("systemone");
+    // An empty model keeps the model method selected until the field is filled.
+    expect(jevDecisionMethod({ decisionModel: "" })).toBe("model");
+    expect(jevDecisionMethod({ decisionProvider: "mytev", decisionModel: "a/m1" })).toBe("model");
+  });
+
+  test("model validation refuses empty, self, and JEV routes and allows ordinary ones", () => {
+    const jev = parseOne({ strategy: "jev" });
+    expect(jev.model).toBe("combo/tev-auto");
+    expect(validate({ ...jev, decisionModel: "a/m1" })).toBeNull();
+    expect(validate({ ...jev, decisionModel: "combo/coding" })).toBeNull();
+    expect(validate({ ...jev, decisionModel: "" })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "x".repeat(513) })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "combo/tev-auto" })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "router" })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "combo/router-combo" })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "a/m1", decisionProvider: "mytev" })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "a/m9" }, { decisionModels: ["a/m1"] })).toBe("invalidDecisionModel");
+    expect(validate({ ...jev, decisionModel: "a/m1" }, { decisionModels: ["a/m1"] })).toBeNull();
+    // Off JEV the stored model is inert.
+    expect(validate({ ...jev, strategy: "failover", decisionModel: "combo/tev-auto" })).toBeNull();
+  });
+
+  test("the GUI refuses only exact self/JEV selectors and leaves synthetic suffixes to the server", () => {
+    const self = { id: "tev-auto", alias: null, model: "combo/tev-auto" };
+    const combos = [
+      { id: "router-combo", alias: "router", model: "router", strategy: "jev" },
+      { id: "coding", alias: null, model: "combo/coding", strategy: "failover" },
+    ];
+    expect(jevDecisionModelForbidden("combo/tev-auto", combos, self)).toBe(true);
+    expect(jevDecisionModelForbidden(" router ", combos, self)).toBe(true);
+    expect(jevDecisionModelForbidden("combo/router-combo", combos, self)).toBe(true);
+    expect(jevDecisionModelForbidden("combo/coding", combos, self)).toBe(false);
+    // Whether a suffix is a synthetic selector depends on server settings and known ids.
+    expect(jevDecisionModelForbidden("combo/tev-auto--fast", combos, self)).toBe(false);
+    expect(jevDecisionModelForbidden("router--high", combos, self)).toBe(false);
+  });
+
+  test("model options list enabled routable models and non-JEV combos only", () => {
+    const models = [
+      { provider: "a", id: "m1" },
+      { provider: "a", id: "m0", namespaced: "a/m0-ns" },
+      { provider: "a", id: "gone", disabled: true },
+      { provider: "off", id: "x" },
+      { provider: "tev-local", id: "tev1:4b" },
+      { provider: "combo", id: "coding" },
+    ];
+    const rows = [...providers, { name: "off", adapter: "openai-chat", disabled: true }];
+    const combos = [
+      { id: "tev-auto", alias: null, model: "combo/tev-auto", strategy: "jev" },
+      { id: "router-combo", alias: "router", model: "router", strategy: "jev" },
+      { id: "coding", alias: null, model: "combo/coding", strategy: "failover" },
+    ];
+    expect(jevDecisionModelOptions(models, rows, combos, { id: "tev-auto", alias: null, model: "combo/tev-auto" }))
+      .toEqual(["a/m0-ns", "a/m1", "combo/coding"]);
+    // A non-JEV combo never lists itself.
+    expect(jevDecisionModelOptions(models, rows, combos, { id: "coding", alias: null, model: "combo/coding" }))
+      .toEqual(["a/m0-ns", "a/m1"]);
   });
 });
