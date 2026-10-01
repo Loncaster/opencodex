@@ -1,4 +1,4 @@
-import { constants, generateKeyPairSync, privateDecrypt, randomUUID } from "node:crypto";
+import { constants, createHash, generateKeyPairSync, privateDecrypt, randomUUID } from "node:crypto";
 import { redactSecretString } from "../lib/redact";
 
 export const ZED_WEB_BASE_URL = "https://zed.dev";
@@ -108,7 +108,8 @@ function normalizeModelId(value: unknown): string {
 }
 
 function zedCacheKey(credentials: ZedCredentials): string {
-  return `${credentials.userId}:${credentials.accessToken}`;
+  // In-memory caches are keyed by an irreversible digest so no map key holds the raw token.
+  return createHash("sha256").update(JSON.stringify([credentials.userId, credentials.accessToken])).digest("hex");
 }
 
 function zedUrl(path: string, baseUrl = ZED_CLOUD_BASE_URL): string {
@@ -377,6 +378,7 @@ export async function zedLlmFetch(
   };
   let response = await request(false);
   if (shouldRefreshZedLlmToken(response)) {
+    await response.body?.cancel().catch(() => undefined);
     response = await request(true);
   }
   return response;

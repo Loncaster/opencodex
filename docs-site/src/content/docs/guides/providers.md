@@ -234,6 +234,14 @@ After a terminal Nous refresh failure, run `ocx login nous` to reauthenticate.
 
 ### Zed Hosted AI (experimental)
 
+:::caution[Unofficial — use at your own risk]
+Zed does not provide or endorse this bridge. It reuses your Zed account's hosted-model
+entitlement outside the Zed editor, which may be outside Zed's terms of service. Zed may rate
+limit, restrict, or suspend the account. Review Zed's current terms before you sign in; the
+provider stays off until you add it and run `ocx login zed` yourself, and the dashboard asks
+you to acknowledge this risk before it starts the login.
+:::
+
 Run `ocx login zed` and complete Zed's native-app sign-in in the browser. OpenCodex starts a
 loopback callback, gives Zed an RSA public key, and keeps the matching private key local while
 the callback returns the account identity and encrypted access token. The stored account id and
@@ -242,9 +250,8 @@ token before calling `https://cloud.zed.dev/completions`.
 
 Zed's live model roster is account-scoped display metadata. The selected model id is forwarded as
 provided, and the bridge infers the hosted backend family from the live row or the model name;
-model discovery is not an allowlist. Zed's hosted inference bridge is unofficial and may be
-outside Zed's service terms or subject to account enforcement. Review Zed's current terms and
-accept that risk before enabling it; Andrew must complete a real login and prompt test locally.
+model discovery is not an allowlist. The Zed access token has no refresh endpoint, so when Zed
+revokes it, run `ocx login zed` again.
 
 For the canonical Kimi Coding Plan presets (`kimi` account login and `kimi-code` API key),
 opencodex forwards only a caller-supplied stable `prompt_cache_key` to the Chat Completions request

@@ -1161,9 +1161,12 @@ login stores the Zed account identity with its native-app access token in the no
 
 The bridge obtains a short-lived hosted-inference token and sends `POST /completions`. The live
 `/models` roster is used for account-specific picker metadata only: arbitrary model ids remain
-forwardable, with the backend family inferred from the live provider field or model name. This is
-an unofficial integration and may be outside Zed's service terms; confirm the current terms and
-accept the account-enforcement risk before enabling it.
+forwardable, with the backend family inferred from the live provider field or model name.
+
+:::caution[Unofficial — use at your own risk]
+Zed does not provide or endorse this integration, and it may be outside Zed's terms of service.
+Zed may limit or suspend an account that uses it. The provider is never enabled by default.
+:::
 
 ## OpenRouter provider routing
 

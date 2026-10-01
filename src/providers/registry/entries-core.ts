@@ -173,7 +173,7 @@ export const PROVIDER_REGISTRY_CORE: readonly ProviderRegistryEntry[] = [
       maxResponseBytes: 4 * 1024 * 1024,
       maxModels: 2_000,
     },
-    note: "Experimental Zed Hosted AI bridge. Login uses Zed's native-app RSA callback and consumes the signed-in Zed account's hosted-model entitlement. This route is unofficial and may be outside Zed's service terms; review before enabling.",
+    note: "Experimental and unofficial Zed Hosted AI bridge, not endorsed by Zed. Use at your own risk: it consumes the signed-in Zed account's hosted-model entitlement and may be outside Zed's terms, and Zed may limit or suspend the account.",
   },
   {
     // The canonical Cognition account provider, after absorbing `devin-cli`

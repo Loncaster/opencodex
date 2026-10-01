@@ -666,8 +666,8 @@ appended to the id instead.
   inside Zed's provider envelope, then unwraps Zed's NDJSON/SSE events back into `AdapterEvent`.
 - Fetches a bounded, account-scoped live model roster for display and provider-family inference;
   the roster is not a model allowlist, so a caller-supplied model id is still forwarded.
-- Experimental unofficial bridge. Zed's service terms and account enforcement remain the user's
-  responsibility; review them before enabling the route.
+- Experimental, unofficial, and not endorsed by Zed. Using it may break Zed's terms of service
+  and can get the Zed account limited or suspended; that risk is the user's to accept.
 
 ## `azure-openai` (alias: `azure`)
 

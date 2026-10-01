@@ -188,16 +188,16 @@ export function createZedAdapter(provider: OcxProviderConfig): ProviderAdapter {
     }
     const zedProvider = providerFromCatalog(catalog, parsed.modelId);
     const selected = createDelegate(provider, zedProvider);
-   const safeIncoming: IncomingMeta = {
+    const safeIncoming: IncomingMeta = {
      headers: incoming?.headers ?? new Headers(),
      translatorBudget: incoming?.translatorBudget ?? createTranslatorBudget(),
      ...(incoming?.providerFetch ? { providerFetch: incoming.providerFetch } : {}),
      ...(incoming?.abortSignal ? { abortSignal: incoming.abortSignal } : {}),
-   };
-   const built = await selected.buildRequest(forceStreaming(parsed), safeIncoming);
-   let providerRequest: unknown;
-   try { providerRequest = JSON.parse(built.body) as unknown; } catch { throw new Error("Zed delegate produced an invalid request body"); }
-   if (zedProvider === "google" && isRecord(providerRequest)) delete providerRequest.safetySettings;
+    };
+    const built = await selected.buildRequest(forceStreaming(parsed), safeIncoming);
+    let providerRequest: unknown;
+    try { providerRequest = JSON.parse(built.body) as unknown; } catch { throw new Error("Zed delegate produced an invalid request body"); }
+    if (zedProvider === "google" && isRecord(providerRequest)) delete providerRequest.safetySettings;
     if (zedProvider === "anthropic" && isRecord(providerRequest) && Array.isArray(providerRequest.messages)) {
       providerRequest.messages = providerRequest.messages.map((m: unknown) => {
         if (isRecord(m) && typeof m.content === "string") {
@@ -242,8 +242,8 @@ export function createZedAdapter(provider: OcxProviderConfig): ProviderAdapter {
         });
       }
     }
-   if (!isRecord(providerRequest)) throw new Error("Zed delegate produced a non-object request body");
-   delegate = { provider: zedProvider, adapter: selected };
+    if (!isRecord(providerRequest)) throw new Error("Zed delegate produced a non-object request body");
+    delegate = { provider: zedProvider, adapter: selected };
     const requestUrl = `${provider.baseUrl.replace(/\/+$/, "")}/completions`;
     return {
       url: requestUrl,
