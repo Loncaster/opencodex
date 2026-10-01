@@ -2,7 +2,13 @@ import type { OcxProviderConfig } from "../types";
 import { redactSecretString } from "./redact";
 import { runtimeProviderFetch } from "./provider-runtime-fetch";
 import { markEgressTransparentExecutor } from "./provider-egress";
-import { outboundProxyConfigured, resolveProxyRoute, type ProxyEnvMap } from "./proxy-env";
+import {
+  outboundProxyConfigured,
+  proxyEnvPresent,
+  resolveProxyRoute,
+  socks5ProxyFromEnv,
+  type ProxyEnvMap,
+} from "./proxy-env";
 
 export type ProviderTlsProfile = "antigravity-browser";
 /**
@@ -142,6 +148,12 @@ function tlsProxyOption(init: RequestInit | undefined, destination: string | URL
   if (decided === false) return requireDirect(env);
   const route = (runtime?.resolveProxyRoute ?? resolveProxyRoute)(new URL(destination), env);
   if (route.kind === "fallback") {
+    // `resolveProxyRoute` only classifies HTTP(S) proxies; an inherited ALL_PROXY of socks5://
+    // or socks5h:// is the route the ordinary outbound path takes through socks5ProxyFromEnv().
+    // Carry that same route when no HTTPS-specific variable outranks it, instead of refusing
+    // every Antigravity send for an operator whose only global proxy is SOCKS.
+    const socks = proxyEnvPresent("HTTPS_PROXY", env) ? undefined : socks5ProxyFromEnv(env);
+    if (socks) return { proxy: socks.trim() };
     throw new Error("provider TLS profile cannot preserve configured proxy semantics");
   }
   if (route.kind === "proxy") return { proxy: route.proxy };

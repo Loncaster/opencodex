@@ -9,6 +9,7 @@ import {
   setProviderTlsRuntimeForTest,
 } from "../../src/lib/provider-tls-profile";
 import { isEgressTransparentExecutor } from "../../src/lib/provider-egress";
+import { providerManagementConfigError } from "../../src/server/auth-cors";
 import { providerFetch } from "../../src/server/responses/fetch-helpers";
 import type { OcxProviderConfig } from "../../src/types";
 
@@ -249,6 +250,33 @@ describe("provider TLS profile", () => {
       "https://cloudcode-pa.googleapis.com/v1", { proxy: "ftp://127.0.0.1:21" } as RequestInit))
       .rejects.toThrow("cannot preserve configured proxy semantics");
     expect(seen.calls).toBe(0);
+  });
+
+  test("carries an inherited SOCKS5 ALL_PROXY route like the ordinary outbound path", async () => {
+    for (const socks of ["socks5://127.0.0.1:1080", "socks5h://127.0.0.1:1080"]) {
+      const seen = captureRuntime({ ALL_PROXY: socks });
+      await providerTlsFetch("google-antigravity", canonical, fetch)("https://cloudcode-pa.googleapis.com/v1");
+      expect(seen.calls).toBe(1);
+      expect(seen.init?.proxy).toBe(socks);
+    }
+  });
+
+  test("still refuses an inherited route when an HTTPS proxy variable outranks the SOCKS fallback", async () => {
+    const seen = captureRuntime({ HTTPS_PROXY: "ftp://global.invalid:21", ALL_PROXY: "socks5://127.0.0.1:1080" });
+    await expect(providerTlsFetch("google-antigravity", canonical, fetch)("https://cloudcode-pa.googleapis.com/v1"))
+      .rejects.toThrow("cannot preserve configured proxy semantics");
+    expect(seen.calls).toBe(0);
+  });
+
+  test("the management write boundary refuses a row that keeps tlsProfile after leaving eligibility", () => {
+    const keyAuth = providerManagementConfigError("google-antigravity", { ...canonical, authMode: "key" });
+    expect(keyAuth).toContain("tlsProfile antigravity-browser requires");
+    const moved = providerManagementConfigError("google-antigravity", { ...canonical, baseUrl: "https://example.com" });
+    expect(moved).toContain("tlsProfile antigravity-browser requires");
+    const renamed = providerManagementConfigError("antigravity-copy", canonical);
+    expect(renamed).toContain("tlsProfile antigravity-browser requires");
+    const eligible = providerManagementConfigError("google-antigravity", canonical);
+    expect(eligible ?? "").not.toContain("tlsProfile");
   });
 
   test("is transparent to provider egress and reports pending before its first send", () => {
