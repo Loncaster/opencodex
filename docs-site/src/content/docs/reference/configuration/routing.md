@@ -219,9 +219,9 @@ description strings, which Ollama requires. `tev1` was trained on 2–24 options
 effort pairs at 24 or fewer (fewer than 2 or more than 26 fail open without a request);
 its effective context is about 2k tokens and OpenCodex clips the task text to 500 characters. Keep the
 model resident (`OLLAMA_KEEP_ALIVE=-1`) and raise `decisionTimeoutMs` for slow services; see
-[Self-hosted decision model](/guides/combos/#self-hosted-decision-model-eg-ollama-tev1).
-In the dashboard, set both from the JEV Combo's **Decision service** and **Decision timeout (ms)**
-fields under **Models → Combos**.
+[System One-compatible server](/guides/combos/#system-one-compatible-server).
+In the dashboard, choose **System One-compatible server** in the JEV Combo's **Decision method**
+section under **Models → Combos**, then pick the row and set **Decision timeout (ms)**.
 
 ## Routing policy profiles (`config.routingProfiles`)
 

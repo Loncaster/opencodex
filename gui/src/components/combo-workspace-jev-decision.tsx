@@ -78,7 +78,8 @@ export function ComboJevDecisionSection({
   const testAbort = useRef<AbortController | null>(null);
   const selectionKey = `${method}\0${decisionProvider ?? ""}\0${decisionModel ?? ""}\0${decisionTimeoutMs ?? ""}`;
   const test = probe?.key === selectionKey ? probe.result : null;
-  const modelListId = `${idPrefix}-decision-model-options`;
+  // Concatenated, not a template: the i18n lint reads template text outside JSX id props as copy.
+  const modelListId = idPrefix + "-decision-model-options";
 
   // Changing the selection (or unmounting) cancels an in-flight probe for the old one.
   useEffect(() => () => {
