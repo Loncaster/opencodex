@@ -3,6 +3,8 @@ import {
   clearComboSelectionState,
   clearComboTargetCooldowns,
   coolComboTarget,
+  comboConfigError,
+  normalizeComboConfig,
 } from "../../src/combos";
 import { catalogModelSlug, clearGatherRoutedModelsInflight, gatherRoutedModels } from "../../src/codex/catalog";
 import { createTranslatorBudget } from "../../src/lib/translator-budget";
@@ -153,7 +155,71 @@ function success(model: string): Response {
   return Response.json({ id: `resp-${model}`, object: "response", status: "completed", model, output: [] });
 }
 
+function groupedConfig(choice: string, seen: Array<Record<string, unknown>> = [], jevKey?: null): OcxConfig {
+  const config = makeConfig({ jevFetch: choiceFetch(choice, seen), jevKey });
+  config.providers.reserve = { ...config.providers.sol!, models: ["gpt-5.6-sol", "gpt-6-astra"],
+    modelReasoningEfforts: { "gpt-5.6-sol": ["medium", "high"], "gpt-6-astra": ["high"] } };
+  config.combos!.auto!.cooldownWaitPolicy = "before-last-resort";
+  config.combos!.auto!.targets = [
+    { provider: "sol", model: "gpt-5.6-sol", fallbackGroup: "sol" },
+    { provider: "reserve", model: "gpt-5.6-sol", fallbackGroup: "sol", lastResort: true },
+    { provider: "astra", model: "gpt-6-astra", fallbackGroup: "astra" },
+    { provider: "reserve", model: "gpt-6-astra", fallbackGroup: "astra", lastResort: true },
+  ];
+  return config;
+}
+
 describe("JEV Combo runtime", () => {
+  test.each(["sol", "astra"])("grouped fallback preserves JEV effort and family (%s)", async group => {
+    const seen: Array<Record<string, unknown>> = [];
+    const model = group === "sol" ? "gpt-5.6-sol" : "gpt-6-astra";
+    const config = groupedConfig(`${group}/${model}:high`, seen);
+    const children: Record<string, unknown>[] = [];
+    const response = await execute(config, body => {
+      children.push(body);
+      return children.length === 1 ? Response.json({ error: { message: "temporary outage" } }, { status: 503 }) : success(String(body.model));
+    }, { reasoning: { effort: "medium" }, service_tier: "priority" });
+    expect(response.status).toBe(200);
+    expect(seen).toHaveLength(1);
+    expect(children.map(body => body.model)).toEqual([`${group}/${model}`, `reserve/${model}`]);
+    for (const body of children) {
+      expect(body).toMatchObject({ reasoning: { effort: "high" } });
+      expect(body).not.toHaveProperty("service_tier");
+    }
+  });
+
+  test("offers a group's reserve when its primary cools, despite another healthy group", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const config = groupedConfig("reserve/gpt-5.6-sol:medium", seen);
+    coolComboTarget("auto", config.combos!.auto!.targets[0]!, { cooldownMs: 10_000 });
+    const models: string[] = [];
+    const response = await execute(config, body => { models.push(String(body.model)); return success(String(body.model)); });
+    expect(response.status).toBe(200);
+    expect(models).toEqual(["reserve/gpt-5.6-sol"]);
+    const criteria = (seen[0]!.questions as { route: { criteria: Record<string, unknown> } }).route.criteria;
+    expect(Object.keys(criteria)).toContain("reserve/gpt-5.6-sol:medium");
+    expect(Object.keys(criteria).some(key => key.startsWith("reserve/gpt-6-astra:"))).toBe(false);
+  });
+
+  test("grouped fail-open stays on Sol when JEV has no credential", async () => {
+    const config = groupedConfig("astra/gpt-6-astra:high", [], null);
+    coolComboTarget("auto", config.combos!.auto!.targets[0]!, { cooldownMs: 10_000 });
+    const models: string[] = [];
+    expect((await execute(config, body => { models.push(String(body.model)); return success(String(body.model)); })).status).toBe(200);
+    expect(models).toEqual(["reserve/gpt-5.6-sol"]);
+  });
+
+  test("validates and normalizes optional fallback groups", () => {
+    const config = groupedConfig("sol/gpt-5.6-sol:medium");
+    const combo = config.combos!.auto!;
+    expect(comboConfigError("auto", combo, config.providers)).toBeNull();
+    expect(normalizeComboConfig(combo).targets[0]!.fallbackGroup).toBe("sol");
+    combo.targets[0]!.fallbackGroup = "unsafe/group";
+    expect(comboConfigError("auto", combo, config.providers)).toContain("fallbackGroup");
+    combo.targets[0]!.fallbackGroup = null;
+    expect(normalizeComboConfig(combo).targets[0]).not.toHaveProperty("fallbackGroup");
+  });
+
   test("records the selected target and JEV usage on the parent request", async () => {
     const config = makeConfig({
       jevFetch: (async () => Response.json({

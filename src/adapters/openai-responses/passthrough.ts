@@ -39,6 +39,7 @@ import { dropResponsesReasoningInputItems, mapRoutedResponsesReasoningEffort, no
 import { scrubOcxCompactionItems, stripCanonicalOnlyToolFields, stripCanonicalOnlyTopLevelFields, stripInternalChatMessageMetadataPassthrough, stripInvalidItemIds, stripItemIdsWhenUnstored, stripRejectedSamplingParams } from "./request-strips";
 import { stripCanonicalForwardPromptCacheOptions, stripDeprecatedPromptCacheRetention } from "./prompt-cache";
 import { isPlainObject } from "./internal";
+import { isDeclaredReasoningEffort } from "../../reasoning-effort";
 import { normalizeToolSchemas, promoteClientLoadedTools, stripUnsupportedHostedTools } from "./tool-schema";
 import { annotateEmptyResponsesToolOutputs, backfillWebSearchQueries, normalizeResponsesToolResultAdjacency, repairOrphanedInputItems, repairOversizedReplayCallIds, repairUnidentifiedToolOutputItems, restoreBridgedWebSearchCalls } from "./tool-output-recovery";
 import { bridgeSearchReplayScope } from "../../responses/bridge-search-replay-cache";
@@ -579,6 +580,10 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         headers,
         body,
         releaseBodyObservation,
+        ...(isPlainObject(finalBody) && isPlainObject(finalBody.reasoning)
+          && typeof finalBody.reasoning.effort === "string" && isDeclaredReasoningEffort(finalBody.reasoning.effort)
+          ? { reasoningLog: { effectiveEffort: finalBody.reasoning.effort, wireField: "reasoning.effort" as const, wireValue: finalBody.reasoning.effort } }
+          : {}),
         ...(convertedRoutedCustomToolNames ? { convertedRoutedCustomToolNames } : {}),
         ...(routedCustomToolRepairNames ? { routedCustomToolRepairNames } : {}),
         ...(convertedRoutedToolSearchNames ? { convertedRoutedToolSearchNames } : {}),

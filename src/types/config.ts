@@ -1301,6 +1301,8 @@ export interface OcxComboTarget {
    * service for this target. The built-in model profile always applies.
    */
   modelProfile?: string;
+  /** JEV retries stay within the selected group. null/omitted leaves ordinary failover unchanged. */
+  fallbackGroup?: string | null;
   /**
    * Marks an emergency-only target. Inert unless the combo sets
    * `cooldownWaitPolicy`, and never makes a target permanently ineligible —

@@ -508,13 +508,12 @@ Regression coverage: `tests/responses/responses-forward-prompt-envelope.test.ts`
 
 ## Combo default effort precedence
 
-`src/combos/request.ts` keeps `reasoningEffortMode` and `defaultEffortMode` independent.
-The existing fifth argument remains the strict/adaptive capability-normalization policy;
-the optional sixth argument enables fallback/force precedence. Force requires a valid
-non-null default, overrides only valid caller effort on a known supported ladder, and
-retains the existing unsupported-control stripping. It does not add a caller opt-in or
-change target selection. `src/server/responses/core-combo.ts` applies the policy per child
-and preserves the original requested effort separately from effective wire telemetry.
+JEV `fallbackGroup` keeps retries in the chosen family and retains its effort, preventing outage-driven escalation.
+The Responses passthrough records serialized `reasoning.effort` in durable telemetry.
+`src/combos/request.ts` keeps capability normalization (fifth argument) independent from fallback/force precedence (sixth).
+Force requires a non-null default and overrides only valid caller effort on a known supported ladder,
+retaining unsupported-control stripping and target selection. `src/server/responses/core-combo.ts`
+applies this per child and preserves original requested effort separately from effective wire telemetry.
 `src/server/chat-completions.ts` routes combos through that same child pipeline while
 retaining the current config-aware native-Chat eligibility check for non-combo routes.
 

@@ -42,6 +42,7 @@ export interface NormalizedComboTarget {
   reasoningEfforts?: OcxComboDefaultEffort[];
   /** Optional JEV decision description. */
   modelProfile?: string;
+  fallbackGroup?: string;
 }
 
 export interface NormalizedComboConfig {
@@ -427,6 +428,10 @@ export function comboConfigIssues(
         message: `targets[${i}].lastResort must be a boolean`,
       });
     }
+    if (target.fallbackGroup !== undefined && target.fallbackGroup !== null
+      && (typeof target.fallbackGroup !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(target.fallbackGroup))) {
+      issues.push({ path: ["targets", i, "fallbackGroup"], message: "fallbackGroup must be an id of at most 64 characters or null" });
+    }
     if (target.modelProfile !== undefined
       && (typeof target.modelProfile !== "string"
         || target.modelProfile.trim().length === 0
@@ -502,6 +507,7 @@ export function normalizeComboConfig(raw: OcxComboConfig): NormalizedComboConfig
       ...(typeof target.modelProfile === "string" && target.modelProfile.trim()
         ? { modelProfile: target.modelProfile.trim() }
         : {}),
+      ...(typeof target.fallbackGroup === "string" ? { fallbackGroup: target.fallbackGroup } : {}),
       lastResort: target.lastResort === true,
     })),
   };

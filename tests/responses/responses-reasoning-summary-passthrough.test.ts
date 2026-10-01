@@ -3,6 +3,7 @@ import { providerConfigSeed } from "../../src/providers/derive";
 import { getProviderRegistryEntry } from "../../src/providers/registry";
 import { handleResponses } from "../../src/server/responses/core";
 import type { OcxConfig } from "../../src/types";
+import type { RequestLogContext } from "../../src/server/request-log";
 import { acquireOwnedSpendHome } from "../helpers/owned-spend-home";
 
 let releaseSpendHome: (() => void) | undefined;
@@ -50,6 +51,7 @@ async function runHandleResponses(
   upstreamBody: unknown,
   contentType: string,
   provider: Record<string, unknown> = {},
+  logCtx: RequestLogContext = { model: "", provider: "" },
 ) {
   const encoder = new TextEncoder();
   const payload = typeof upstreamBody === "string"
@@ -76,7 +78,7 @@ async function runHandleResponses(
       body: JSON.stringify(body),
     }),
     config,
-    { model: "", provider: "" },
+    logCtx,
     { abortSignal: AbortSignal.timeout(5_000) },
   );
 }
@@ -88,6 +90,18 @@ describe("passthrough reasoning summary rewrite honors hideThinkingSummary", () 
     releaseSpendHome?.();
     releaseSpendHome = undefined;
     globalThis.fetch = originalFetch;
+  });
+
+  test("records the serialized reasoning effort, not just the caller's requested label", async () => {
+    const logCtx: RequestLogContext = { model: "", provider: "" };
+    const response = await runHandleResponses(
+      { model: "deepseek-v4-flash", input: "ping", stream: true, reasoning: { effort: "high" } },
+      SSE_UPSTREAM_FRAMES.join(""), "text/event-stream", {}, logCtx,
+    );
+    await response.text();
+    expect(logCtx.effectiveEffort).toBe("high");
+    expect(logCtx.reasoningWireField).toBe("reasoning.effort");
+    expect(logCtx.reasoningWireValue).toBe("high");
   });
 
   test("SSE: hidden thinking stays on the content channel", async () => {

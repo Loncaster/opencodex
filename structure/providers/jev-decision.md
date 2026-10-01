@@ -77,7 +77,7 @@ An absent note leaves the prior decision payload shape intact.
 `src/server/responses/core-combo.ts` computes current eligibility, asks JEV once for the initial pick,
 applies the validated effort, and removes caller `service_tier` for that child. A retryable child
 failure re-enters the ordinary Combo fallback loop from the untouched request without another JEV
-call. Each target may carry an optional non-empty `reasoningEfforts` allowlist. Omission keeps the
+call. Optional `targets[].fallbackGroup` keeps retries in the selected family and preserves the JEV effort; under `before-last-resort`, a reserve is withheld only while its group has an eligible primary. Ungrouped targets retain ordinary fallback. Each target may carry an optional non-empty `reasoningEfforts` allowlist. Omission keeps the
 backward-compatible all-advertised behavior; a present list is intersected with current capabilities,
 and an empty intersection removes that target from the JEV choice map rather than broadening it.
 Direct models and every other Combo strategy bypass this path. The shared Combo editor owns the GUI

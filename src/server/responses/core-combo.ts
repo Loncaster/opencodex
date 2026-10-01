@@ -296,7 +296,9 @@ function eligibleJevComboChoices(
   // same rule here — withhold them from JEV while any normal target is offered, never when
   // they are all that remains.
   if (combo.cooldownWaitPolicy === "before-last-resort" && choices.some(choice => !choice.pick.target.lastResort)) {
-    return choices.filter(choice => !choice.pick.target.lastResort);
+    return choices.filter(choice => !choice.pick.target.lastResort || !choices.some(normal =>
+      !normal.pick.target.lastResort && (choice.pick.target.fallbackGroup === undefined
+        || normal.pick.target.fallbackGroup === choice.pick.target.fallbackGroup)));
   }
   return choices;
 }
@@ -442,10 +444,12 @@ export async function executeComboResponses(
     }
   };
   let comboPayloadReadable = false;
+  let selectedJevGroup: string | undefined;
   const payloadEligible = (target: (typeof combo.targets)[number]): boolean =>
     comboPayloadReadable || !unreadableEncryptedAgentTask || canDecryptUnreadableAgentTask(target);
   const targetEligible = (target: (typeof combo.targets)[number]): boolean =>
     (combo.strategy !== "jev" || target.provider !== JEV_PROVIDER_ID)
+    && (selectedJevGroup === undefined || target.fallbackGroup === selectedJevGroup)
     && payloadEligible(target)
     && reasoningReplayEligible(target)
     && (protocolLanes?.pickable(target) ?? true);
@@ -609,6 +613,7 @@ export async function executeComboResponses(
     jevDecision = decision;
     const selected = choices.find(choice => choice.candidate.key === decision.targetKey) ?? first;
     pick = { ...selected.pick, attempted: [targetKey(selected.pick.target)] };
+    selectedJevGroup = pick.target.fallbackGroup;
     logCtx.jevDecision = normalizePersistedJevDecision({
       version: 1,
       comboId,
@@ -752,7 +757,7 @@ export async function executeComboResponses(
       provider: targetRoute.provider,
       modelId: targetRoute.modelId,
     });
-    const initialJevDecision = firstComboTarget ? jevDecision : undefined;
+    const initialJevDecision = firstComboTarget || selectedJevGroup !== undefined ? jevDecision : undefined;
     const childInput = options.droidDefaultEffort && isPlainObject(body) ? { ...body } : body;
     applyDroidResponsesReasoningDefault(childInput, options.droidDefaultEffort, {
       provider: targetRoute.provider,

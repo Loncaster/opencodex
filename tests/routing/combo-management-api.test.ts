@@ -814,7 +814,7 @@ describe("combo management API", () => {
           cooldownWaitPolicy: "before-last-resort",
           targets: [
             { provider: "a", model: "m1" },
-            { provider: "b", model: "m2", lastResort: true },
+            { provider: "b", model: "m2", lastResort: true, fallbackGroup: "sol" },
           ],
         },
       });
@@ -834,11 +834,11 @@ describe("combo management API", () => {
       expect(config.combos?.padded).toMatchObject({
         targets: [
           { provider: "a", model: "m1" },
-          { provider: "b", model: "m2", lastResort: true },
+          { provider: "b", model: "m2", lastResort: true, fallbackGroup: "sol" },
         ],
       });
       const persisted = JSON.parse(readFileSync(getConfigPath(), "utf8")) as OcxConfig;
-      expect(persisted.combos?.padded?.targets?.[1]).toMatchObject({ lastResort: true });
+      expect(persisted.combos?.padded?.targets?.[1]).toMatchObject({ lastResort: true, fallbackGroup: "sol" });
     });
   });
 

@@ -203,7 +203,6 @@ export async function handleComboRoutes(ctx: ManagementContext): Promise<Respons
               // A non-record entry stays as the client sent it so comboConfigError reports it.
               // Reading `lastResort` off it here would throw in place of that structured 400.
               if (!isPlainRecord(target)) return target;
-              if (Object.hasOwn(target, "lastResort")) return target;
               const rawProvider = target.provider;
               const rawModel = target.model;
               if (typeof rawProvider !== "string" || typeof rawModel !== "string") return target;
@@ -214,7 +213,10 @@ export async function handleComboRoutes(ctx: ManagementContext): Promise<Respons
               const before = previous.targets.find(
                 candidate => candidate.provider === provider && candidate.model === model,
               );
-              return before?.lastResort ? { ...target, lastResort: true } : target;
+              return { ...target,
+                ...(!Object.hasOwn(target, "lastResort") && before?.lastResort ? { lastResort: true } : {}),
+                ...(!Object.hasOwn(target, "fallbackGroup") && before?.fallbackGroup ? { fallbackGroup: before.fallbackGroup } : {}),
+              };
             }),
           }
         : {}),

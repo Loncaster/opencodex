@@ -209,6 +209,14 @@ This ranking and provider exclusion before dispatch require fresh model-inferenc
 
 ### Decision method
 
+Optional `targets[].fallbackGroup` ids keep retries within the family selected by JEV, preserving
+its reasoning effort. For example, group a primary and reserve Sol together, and primary and
+reserve Astra separately: a Sol outage cannot escalate the request to Astra. With
+`cooldownWaitPolicy: "before-last-resort"`, each group's reserve is withheld while its primary
+is available, and remains a JEV choice when that primary is unavailable. Omission preserves the
+existing ungrouped behavior; set a group's value to `null` to clear it. The management API
+preserves an existing group when the Combo editor omits this advanced field.
+
 `strategy: "jev"` asks a decision backend to choose the first eligible target and a compatible
 reasoning effort for the current request. It is opt-in: create a JEV Combo and select that Combo
 to use it. Adding a decision credential does not change existing models, aliases, or defaults.

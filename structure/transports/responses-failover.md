@@ -145,7 +145,7 @@ cooldown is live. A stale-generation refusal cannot borrow a sibling request's s
 
 ## Combo per-target reasoning controls
 
-`src/server/responses/core.ts` passes the combo's `reasoningEffortMode` and the final target's
+Opt-in JEV `fallbackGroup` retains the chosen group and effort across uncommitted failures; other groups are ineligible for retries. Ordinary combos remain unchanged. `src/server/responses/core.ts` passes the combo's `reasoningEffortMode` and the final target's
 `supportedLadderFor` result to `src/combos/request.ts` before adapter parsing. Explicit empty
 capability ladders remove effort and thinking controls in every combo mode; adaptive mode also
 removes those controls for unknown ladders and preserves `reasoning.summary`. Known non-empty
