@@ -320,6 +320,7 @@ describe("JEV decision client", () => {
     });
 
     expect(decision).toEqual({
+      backend: "typesafe",
       targetKey: "openai/gpt-5.6-sol",
       effort: "low",
       gate: "apply",
@@ -428,7 +429,7 @@ describe("JEV decision client", () => {
     try {
       expect(await resolveJevDecision({
         body: {}, candidates, fallback, config: jevConfig(), post,
-      })).toMatchObject({ ...fallback, gate: "missing_key" });
+      })).toMatchObject({ backend: "typesafe", ...fallback, gate: "missing_key" });
       expect(await resolveJevDecision({
         body: {}, candidates: [], fallback, config: jevConfig("secret"), post,
       })).toMatchObject({ ...fallback, gate: "no_choices" });
@@ -683,7 +684,7 @@ describe("JEV configurable decision provider", () => {
       body: decisionBody, candidates, fallback, config, decisionProvider: "ollama-tev1", post: recordingPost(calls),
     });
 
-    expect(decision).toMatchObject({ targetKey: "openai/gpt-5.6-sol", effort: "low", gate: "apply" });
+    expect(decision).toMatchObject({ backend: "systemone", targetKey: "openai/gpt-5.6-sol", effort: "low", gate: "apply" });
     expect(calls).toHaveLength(1);
     const call = calls[0]!;
     expect(call.name).toBe("ollama-tev1");

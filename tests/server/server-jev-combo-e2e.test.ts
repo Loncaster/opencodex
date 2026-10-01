@@ -178,6 +178,7 @@ describe("JEV Combo runtime", () => {
       selected: { provider: "sol", model: "gpt-5.6-sol", effort: "high" },
       gate: "apply",
       latencyMs: expect.any(Number),
+      backend: "typesafe",
       confidence: 0.8,
       usage: { inputTokens: 11, outputTokens: 2, totalTokens: 13 },
     });

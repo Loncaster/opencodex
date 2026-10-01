@@ -22,14 +22,14 @@ export const JEV_PROVIDER_ID = "jev";
 export const JEV_API_URL = "https://api.typesafe.ai/v1/systemone";
 export const JEV_MODEL = "jev-latest";
 
-const JEV_MAX_CANDIDATES = 64;
+export const JEV_MAX_CANDIDATES = 64;
 /** Ollama's System One choice questions accept 2..26 options; other services share the floor. */
 const SELF_HOSTED_MIN_OPTIONS = 2;
 const SELF_HOSTED_MAX_OPTIONS = 26;
 /** Environment names that hold TypeSafe credentials; a self-hosted row may never reference them. */
 const TYPESAFE_ENV_KEYS = new Set(["TYPESAFE_API_KEY", "JEV_API_KEY"]);
-const JEV_MAX_REQUEST_BYTES = 65_536;
-const JEV_MAX_RESPONSE_BYTES = 65_536;
+export const JEV_MAX_REQUEST_BYTES = 65_536;
+export const JEV_MAX_RESPONSE_BYTES = 65_536;
 const JEV_OUTBOUND_DEPENDENCIES = {
   isCanonicalUrl: (name: string, url: string) => name === JEV_PROVIDER_ID && url === JEV_API_URL,
   // Self-hosted decision models (Ollama tev1) listen on plain HTTP loopback. The outbound wrapper
@@ -91,7 +91,23 @@ export interface JevCandidate {
   modelProfile?: string;
 }
 
+/**
+ * Which kind of service answered a decision. `typesafe` is the canonical System One endpoint,
+ * `systemone` a configured System One-compatible row, `model` an opencodex-routed model.
+ */
+export type JevDecisionBackend = "typesafe" | "systemone" | "model";
+
+/** The backend a combo's decision settings select. A decision model wins over a provider row. */
+export function jevDecisionBackendFor(
+  combo: { decisionProvider?: string | null; decisionModel?: string | null },
+): JevDecisionBackend {
+  if (typeof combo.decisionModel === "string" && combo.decisionModel.trim()) return "model";
+  const provider = typeof combo.decisionProvider === "string" ? combo.decisionProvider.trim() : "";
+  return provider && provider !== JEV_PROVIDER_ID ? "systemone" : "typesafe";
+}
+
 export interface JevDecision {
+  backend: JevDecisionBackend;
   targetKey: string;
   effort: OcxComboDefaultEffort | null;
   gate: "apply" | "missing_key" | "no_choices" | "no_state" | "timeout" | "network" | "redirect" | "http" | "malformed" | "invalid";
@@ -424,7 +440,7 @@ export function buildJevState(body: unknown, candidates: readonly JevCandidate[]
   };
 }
 
-function hasJevDecisionState(state: Record<string, unknown>): boolean {
+export function hasJevDecisionState(state: Record<string, unknown>): boolean {
   if (typeof state.task === "string" && state.task.trim()) return true;
   if (isRecord(state.signals) && state.signals.has_image === true) return true;
   return isRecord(state.step)
@@ -455,7 +471,7 @@ function candidateOptions(candidates: readonly JevCandidate[]): Map<string, JevR
   return options;
 }
 
-function candidatesFitRequestBounds(candidates: readonly JevCandidate[]): boolean {
+export function candidatesFitRequestBounds(candidates: readonly JevCandidate[]): boolean {
   if (candidates.length > JEV_MAX_CANDIDATES) return false;
   return candidates.every(candidate => [candidate.key, candidate.provider, candidate.model]
     .every(value => value.length > 0 && value.length <= JEV_MAX_CANDIDATE_FIELD_CHARS)
@@ -474,6 +490,24 @@ function criterionDescription(criterion: JevRouteOption["criterion"]): string {
     ? `${criterion.reasoning_effort} reasoning effort`
     : "no reasoning-effort control";
   return `Target ${criterion.target} (provider ${criterion.provider}, model ${criterion.model}) with ${effort}.`;
+}
+
+/** One allowlisted target/effort option, shared by every decision backend. */
+export interface JevRouteOptionDescriptor {
+  key: string;
+  targetKey: string;
+  effort: OcxComboDefaultEffort | null;
+  description: string;
+}
+
+/** Every allowlisted option in question order; throws on a duplicate choice like the builder. */
+export function jevRouteOptions(candidates: readonly JevCandidate[]): JevRouteOptionDescriptor[] {
+  return [...candidateOptions(candidates)].map(([key, option]) => ({
+    key,
+    targetKey: option.targetKey,
+    effort: option.effort,
+    description: criterionDescription(option.criterion),
+  }));
 }
 
 /**
@@ -511,7 +545,7 @@ export function buildJevRouteQuestion(
   };
 }
 
-function jevUsage(payload: Record<string, unknown>): Record<string, number> | undefined {
+export function jevUsage(payload: Record<string, unknown>): Record<string, number> | undefined {
   if (!isRecord(payload.usage)) return undefined;
   const usage: Record<string, number> = {};
   for (const [key, value] of Object.entries(payload.usage)) {
@@ -573,12 +607,23 @@ export function parseJevDecision(
   };
 }
 
-function fallbackDecision(
+export function fallbackDecision(
   fallback: ResolveJevDecisionOptions["fallback"],
   gate: Exclude<JevDecision["gate"], "apply">,
   latencyMs: number,
+  backend: JevDecisionBackend,
 ): JevDecision {
-  return { ...fallback, gate, latencyMs };
+  return { backend, ...fallback, gate, latencyMs };
+}
+
+/** The decision deadline: the configured value when in bounds, otherwise the four-second default. */
+export function jevDecisionTimeoutMs(value: number | undefined): number {
+  return value !== undefined
+    && Number.isInteger(value)
+    && value >= JEV_DECISION_TIMEOUT_MIN_MS
+    && value <= JEV_DECISION_TIMEOUT_MAX_MS
+    ? value
+    : JEV_DECISION_TIMEOUT_DEFAULT_MS;
 }
 
 function canonicalJevProvider(config: OcxConfig): OcxProviderConfig {
@@ -680,8 +725,9 @@ function jevDecisionEndpoint(config: OcxConfig, decisionProvider: string): JevDe
 export async function resolveJevDecision(options: ResolveJevDecisionOptions): Promise<JevDecision> {
   const now = options.now ?? Date.now;
   const startedAt = now();
+  const backend = jevDecisionBackendFor({ decisionProvider: options.decisionProvider });
   const failed = (gate: Exclude<JevDecision["gate"], "apply">): JevDecision =>
-    fallbackDecision(options.fallback, gate, Math.max(0, now() - startedAt));
+    fallbackDecision(options.fallback, gate, Math.max(0, now() - startedAt), backend);
 
   if (options.signal?.aborted) throw options.signal.reason;
   if (options.candidates.length === 0) return failed("no_choices");
@@ -711,12 +757,7 @@ export async function resolveJevDecision(options: ResolveJevDecisionOptions): Pr
     return failed("invalid");
   }
 
-  const timeoutMs = options.timeoutMs !== undefined
-    && Number.isInteger(options.timeoutMs)
-    && options.timeoutMs >= JEV_DECISION_TIMEOUT_MIN_MS
-    && options.timeoutMs <= JEV_DECISION_TIMEOUT_MAX_MS
-    ? options.timeoutMs
-    : JEV_DECISION_TIMEOUT_DEFAULT_MS;
+  const timeoutMs = jevDecisionTimeoutMs(options.timeoutMs);
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const signal = options.signal
     ? AbortSignal.any([options.signal, timeoutSignal])
@@ -770,6 +811,7 @@ export async function resolveJevDecision(options: ResolveJevDecisionOptions): Pr
     }
     if (options.signal?.aborted) throw options.signal.reason;
     return {
+      backend,
       ...parsed,
       gate: "apply",
       latencyMs: Math.max(0, now() - startedAt),

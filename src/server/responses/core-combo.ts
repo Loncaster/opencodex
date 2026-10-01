@@ -31,6 +31,7 @@ import {
   advanceComboAfterFailure,
   comboFailureCooldownScope,
   JEV_PROVIDER_ID,
+  jevDecisionBackendFor,
   resolveJevDecision,
   type ComboPick,
   type JevCandidate,
@@ -545,6 +546,7 @@ export async function executeComboResponses(
     } catch (error) {
       if (options.abortSignal?.aborted) return clientCancelledResponse();
       decision = {
+        backend: jevDecisionBackendFor(combo),
         ...fallback,
         gate: "network",
         latencyMs: Math.max(0, Date.now() - decisionStartedAt),
@@ -563,6 +565,7 @@ export async function executeComboResponses(
       },
       gate: decision.gate,
       latencyMs: decision.latencyMs,
+      backend: decision.backend,
       ...(decision.confidence !== undefined ? { confidence: decision.confidence } : {}),
       ...(decision.chosenProbability !== undefined
         ? { chosenProbability: decision.chosenProbability }
@@ -570,6 +573,7 @@ export async function executeComboResponses(
       ...(decision.usage ? { usage: decision.usage } : {}),
     });
     console.debug("[combo] JEV decision", {
+      backend: decision.backend,
       targetKey: decision.targetKey,
       effort: decision.effort,
       gate: decision.gate,
