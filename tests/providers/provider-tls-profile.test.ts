@@ -4,6 +4,7 @@ import {
   isCanonicalAntigravityUrl,
   providerTlsProfileConfigError,
   providerTlsFetch,
+  providerTlsProfileDiagnostic,
   resetProviderTlsProfileForTests,
   setProviderTlsRuntimeForTest,
 } from "../../src/lib/provider-tls-profile";
@@ -255,6 +256,10 @@ describe("provider TLS profile", () => {
     expect(isEgressTransparentExecutor(fetcher)).toBe(true);
     expect(getProviderTlsProfileStatus("google-antigravity", true)).toBe("pending");
     expect(getProviderTlsProfileStatus("google-antigravity", false)).toBe("disabled");
+    expect(providerTlsProfileDiagnostic("google-antigravity", canonical)).toEqual({
+      tlsProfile: { profile: "antigravity-browser", status: "pending" },
+    });
+    expect(providerTlsProfileDiagnostic("gemini", {})).toEqual({});
   });
 
   test("providerFetch routes the profile through the per-provider egress decision", async () => {

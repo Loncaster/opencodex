@@ -69,6 +69,15 @@ export function getProviderTlsProfileStatus(
   return recorded === undefined || recorded === "disabled" ? "pending" : recorded;
 }
 
+/** The `/api/providers` fragment for a configured profile; empty when the provider has none. */
+export function providerTlsProfileDiagnostic(
+  name: string,
+  provider: Pick<OcxProviderConfig, "tlsProfile">,
+): { tlsProfile?: { profile: ProviderTlsProfile; status: ProviderTlsProfileStatus } } {
+  if (provider.tlsProfile === undefined) return {};
+  return { tlsProfile: { profile: provider.tlsProfile, status: getProviderTlsProfileStatus(name, true) } };
+}
+
 export function resetProviderTlsProfileForTests(): void {
   status = new Map();
   runtime = undefined;

@@ -137,7 +137,7 @@ import { isPlainRecord, parseDebugLogQuery, tokPerSecondResult, unavailableCostR
 import type { MetricUnavailableReason, TokPerSecondResult, CostEstimateReason, CostResult, MetricSource } from "./shared";
 import type { ManagementContext } from "./context";
 import { readManagementJsonBody, rethrowManagementBodyTooLarge } from "./body";
-import { getProviderTlsProfileStatus } from "../../lib/provider-tls-profile";
+import { providerTlsProfileDiagnostic } from "../../lib/provider-tls-profile";
 
 type ProviderPatchApplication =
   | { error: string }
@@ -931,8 +931,7 @@ export async function handleProviderRoutes(ctx: ManagementContext): Promise<Resp
 
   if (url.pathname === "/api/providers" && req.method === "GET") {
     return jsonResponse(Object.entries(config.providers).map(([name, p]) => ({
-      name, adapter: p.adapter, baseUrl: publicProviderBaseUrl(p.baseUrl), defaultModel: p.defaultModel,
-      hasApiKey: !!p.apiKey,
+      name, adapter: p.adapter, baseUrl: publicProviderBaseUrl(p.baseUrl), defaultModel: p.defaultModel, hasApiKey: !!p.apiKey,
       // Presence only (#959 review): header names and values never leave the process.
       hasHeaders: !!p.headers && Object.keys(p.headers).length > 0,
       allowPrivateNetwork: p.allowPrivateNetwork === true,
@@ -964,9 +963,7 @@ export async function handleProviderRoutes(ctx: ManagementContext): Promise<Resp
       // Only opt-in Fast lanes (Anthropic fast mode bills usage credits) get a dashboard switch.
       ...(getProviderRegistryEntry(name)?.fastOptIn === true ? { fastOptIn: { enabled: p.fastEnabled === true } } : {}),
       discovery: p.liveModels === false ? undefined : getProviderDiscoveryStatus(name),
-      ...(p.tlsProfile !== undefined
-        ? { tlsProfile: { profile: p.tlsProfile, status: getProviderTlsProfileStatus(name, true) } }
-        : {}),
+      ...providerTlsProfileDiagnostic(name, p),
       ...(name === "openai" && isCanonicalOpenAiForwardProvider(p)
         ? { entitlement: getCodexModelEntitlementStatus(config) }
         : {}),
