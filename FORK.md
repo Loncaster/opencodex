@@ -1,12 +1,12 @@
 # JEV fork updates
 
 The fork's default `fork-maintenance` branch contains only this automation. The isolated
-JEV patch is commit `6585bae510b45da4ea525f173c405a11da4bf6dd`; the upstream pull request
+JEV patch is commit `8d23aa7b5126c86f499ad42506be203f83d03099`; the upstream pull request
 targets `dev` and does not contain fork automation.
 
 `Update JEV fork` checks the latest stable upstream release daily. It cherry-picks the patch,
 runs typecheck, the focused JEV/outbound regressions, privacy and architecture checks, and builds
-the documentation and GUI. Only successful validation creates `jev-release/<upstream-tag>`.
+the documentation and GUI. Only successful validation creates `jev-release/<upstream-tag>-<patch-revision>`.
 Conflicts or failed checks stop the run without publishing a source branch. Existing release
 branches are left intact. If upstream incorporates the feature, review and retire the patch
 instead of suppressing a cherry-pick conflict.
