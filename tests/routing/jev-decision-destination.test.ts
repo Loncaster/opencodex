@@ -10,7 +10,7 @@ import {
 import type { OcxConfig, OcxProviderConfig } from "../../src/types";
 
 type JevPost = NonNullable<ResolveJevDecisionOptions["post"]>;
-const CUSTOM_URL = "https://decider.example/v1/systemone";
+const CUSTOM_URL = "https://decider.example/v1/decisions";
 const ENV_SECRETS = {
   TYPESAFE_API_KEY: "typesafe-environment-secret",
   JEV_API_KEY: "jev-environment-secret",
@@ -86,6 +86,32 @@ function expectNoTypeSafeSecrets(init: Parameters<JevPost>[3]) {
 }
 
 describe("JEV decision destination credential ownership", () => {
+  test.each(["adapter", "authMode"] as const)("an incompatible selected %s never sends or falls back to TypeSafe", async (field) => {
+    const row = { ...customRow };
+    if (field === "adapter") row.adapter = "openai-chat";
+    else row.authMode = "oauth";
+    const { calls, post } = recordingPost();
+    expect(await resolveJevDecision({
+      body: { input: "Choose a target." }, candidates, fallback,
+      config: configWith("custom-decider", row), decisionProvider: "custom-decider", post,
+    })).toMatchObject({ ...fallback, gate: "missing_key" });
+    expect(calls).toHaveLength(0);
+  });
+
+  test("a custom HTTPS path preserves caller cancellation by identity", async () => {
+    const controller = new AbortController();
+    const reason = new DOMException("caller stopped", "AbortError");
+    const post: JevPost = async (_name, _provider, url, init) => {
+      expect(url).toBe(CUSTOM_URL);
+      controller.abort(reason);
+      throw init.signal?.reason;
+    };
+    await expect(resolveJevDecision({
+      body: { input: "Choose a target." }, candidates, fallback,
+      config: configWith("custom-decider", customRow), decisionProvider: "custom-decider", post, signal: controller.signal,
+    })).rejects.toBe(reason);
+  });
+
   for (const apiKey of ["custom-secret", undefined]) {
     test(`self-hosted row with ${apiKey ? "its own key" : "no key"} never borrows TypeSafe environment secrets`, async () => {
       const { calls, post } = recordingPost();
