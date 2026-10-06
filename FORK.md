@@ -1,7 +1,7 @@
 # JEV fork updates
 
 The fork's default `fork-maintenance` branch contains only this automation. The isolated
-JEV patch is commit `8d23aa7b5126c86f499ad42506be203f83d03099`; the upstream pull request
+JEV patch is commit `e70f1256925790477d861d2cfe592d1e1d8b536d`; the upstream pull request
 targets `dev` and does not contain fork automation.
 
 `Update JEV fork` checks the latest stable upstream release daily. It cherry-picks the patch,
