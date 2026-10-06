@@ -21,8 +21,8 @@ canonical registry transport, with `TYPESAFE_API_KEY` and the standard provider-
 either credential through the JEV client; a retargeted `jev` row is ignored, never a custom
 destination. Automated coverage mocks TypeSafe; live-key behavior is an operator smoke boundary. A Combo's `decisionProvider` selects the service: omitted or `"jev"` (stored as omission) is that
 canonical path with `jev-latest`; any other id must be an enabled `jev-decision` row with a full
-`/systemone` `baseUrl` and a `defaultModel`/`models[0]`, sending only its own `apiKey` (a TypeSafe
-env reference or foreign keychain entry makes it unusable). `allowLocalCleartextPost` in
+full HTTPS decision `baseUrl` (any path) or a local HTTP `/systemone` URL and a `defaultModel`/`models[0]`, sending only its own `apiKey` (a TypeSafe
+env reference or foreign keychain entry makes it unusable). Non-key authentication modes and URLs with userinfo, query strings, or fragments are refused before a send. Shared validation rejects public HTTP hosts; the local-literal check is tested against the transport allowlist. `allowLocalCleartextPost` in
 `src/lib/provider-outbound.ts` admits `http:` only with the row's explicit `allowPrivateNetwork`, a
 `localhost`/loopback/RFC 1918/ULA host whose answers stay in that set, and no proxy. Options go out as
 strings (Ollama requires them); under 2 or over 26 fail open locally (`no_choices`/`invalid`), unusable
