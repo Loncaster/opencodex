@@ -86,16 +86,37 @@ function expectNoTypeSafeSecrets(init: Parameters<JevPost>[3]) {
 }
 
 describe("JEV decision destination credential ownership", () => {
-  test.each(["adapter", "authMode"] as const)("an incompatible selected %s never sends or falls back to TypeSafe", async (field) => {
-    const row = { ...customRow };
-    if (field === "adapter") row.adapter = "openai-chat";
-    else row.authMode = "oauth";
+  test("an incompatible selected adapter never sends or falls back to TypeSafe", async () => {
+    const row: OcxProviderConfig = { ...customRow, adapter: "openai-chat" };
     const { calls, post } = recordingPost();
     expect(await resolveJevDecision({
       body: { input: "Choose a target." }, candidates, fallback,
       config: configWith("custom-decider", row), decisionProvider: "custom-decider", post,
     })).toMatchObject({ ...fallback, gate: "missing_key" });
     expect(calls).toHaveLength(0);
+  });
+
+  test.each(["oauth", "local", "forward"] as const)("authMode %s sends only the row's own key to its own endpoint", async (authMode) => {
+    const { calls, post } = recordingPost();
+    expect((await resolveJevDecision({
+      body: { input: "Choose a target." }, candidates, fallback,
+      config: configWith("custom-decider", { ...customRow, authMode }), decisionProvider: "custom-decider", post,
+    })).gate).toBe("apply");
+    expect(calls.map(call => call.url)).toEqual([CUSTOM_URL]);
+    expect(new Headers(calls[0]!.init.headers).get("authorization")).toBe("Bearer custom-secret");
+    expectNoTypeSafeSecrets(calls[0]!.init);
+  });
+
+  test.each([
+    [`${CUSTOM_URL}/`, `${CUSTOM_URL}/`],
+    ["https://decider.example/v1/systemone/", "https://decider.example/v1/systemone"],
+  ])("baseUrl %s is sent to %s", async (baseUrl, expected) => {
+    const { calls, post } = recordingPost();
+    await resolveJevDecision({
+      body: { input: "Choose a target." }, candidates, fallback,
+      config: configWith("custom-decider", { ...customRow, baseUrl }), decisionProvider: "custom-decider", post,
+    });
+    expect(calls.map(call => call.url)).toEqual([expected]);
   });
 
   test("a custom HTTPS path preserves caller cancellation by identity", async () => {

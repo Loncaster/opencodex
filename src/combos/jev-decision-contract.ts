@@ -13,7 +13,11 @@ export const JEV_DECISION_TIMEOUT_DEFAULT_MS = 4_000;
 /** HTTPS decision services may use any path; local cleartext keeps the `/systemone` contract. */
 export function isSystemOneEndpoint(baseUrl: string): boolean {
   try {
-    const url = new URL(baseUrl.trim());
+    const raw = baseUrl.trim();
+    // URL drops empty delimiters ("?", "#", "@"), so check the raw text before parsing.
+    const authority = raw.replace(/^[a-z][a-z\d+.-]*:[/\\]*/i, "").split(/[/\\]/, 1)[0] ?? "";
+    if (/[?#]/.test(raw) || authority.includes("@")) return false;
+    const url = new URL(raw);
     if (url.username || url.password || url.search || url.hash) return false;
     // URL canonicalizes address literals; keep this import-free for the dashboard bundle.
     const host = url.hostname;
@@ -25,4 +29,14 @@ export function isSystemOneEndpoint(baseUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The URL a decision row is sent to. A `/systemone` path keeps its historical trailing-slash
+ * normalization; any other HTTPS path is the operator's exact endpoint.
+ */
+export function jevDecisionEndpointUrl(baseUrl: string): string {
+  const raw = baseUrl.trim();
+  const stripped = raw.replace(/\/+$/, "");
+  return stripped.endsWith("/systemone") ? stripped : raw;
 }

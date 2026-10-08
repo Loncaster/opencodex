@@ -165,9 +165,12 @@ describe("JEV decision service in the combo workspace", () => {
       expect(jevDecisionRowIssue({ adapter: "jev-decision", baseUrl: url, defaultModel: "m" }) === null)
         .toBe(isSystemOneEndpoint(url));
     }
-    for (const url of ["http://decisions.example/v1/systemone", "http://10.example.com/v1/systemone", "ftp://decisions.example/v1/systemone", "https://user:pass@example.test/v1/decisions", "https://decisions.example/v1/decisions?key=secret", "https://decisions.example/v1/decisions#fragment"]) {
+    for (const url of ["http://decisions.example/v1/systemone", "http://10.example.com/v1/systemone", "ftp://decisions.example/v1/systemone", "https://user:pass@example.test/v1/decisions", "https://decisions.example/v1/decisions?key=secret", "https://decisions.example/v1/decisions#fragment",
+      "https://decisions.example/v1/decisions?", "https://decisions.example/v1/decisions#", "https://decisions.example/v1/decisions?#",
+      "https://@decisions.example/v1/decisions", "https://:@decisions.example/v1/decisions"]) {
       expect(isSystemOneEndpoint(url)).toBeFalse();
     }
+    expect(isSystemOneEndpoint("https://decisions.example/v1/user@decisions")).toBeTrue();
   });
 
   test("HTTP endpoint literals match the transport's local address allowlist", () => {

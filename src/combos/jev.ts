@@ -10,6 +10,7 @@ import {
 } from "../providers/api-key-resolve";
 import { providerMatchesRegistryTransport } from "../providers/registry";
 import type { OcxComboDefaultEffort, OcxConfig, OcxProviderConfig } from "../types";
+import { jevDecisionEndpointUrl } from "./jev-decision-contract";
 import {
   isSystemOneEndpoint,
   JEV_DECISION_TIMEOUT_DEFAULT_MS,
@@ -707,8 +708,7 @@ function jevDecisionEndpoint(
     };
   }
   if (configured?.adapter !== "jev-decision" || typeof configured.baseUrl !== "string") return undefined;
-  if (configured.authMode !== undefined && configured.authMode !== "key") return undefined;
-  const url = configured.baseUrl.trim().replace(/\/+$/, "");
+  const url = jevDecisionEndpointUrl(configured.baseUrl);
   if (!url || !isSystemOneEndpoint(url)) return undefined;
   // `jev-latest` is TypeSafe's model name; a self-hosted host must name its own.
   const model = configured.defaultModel?.trim() || configured.models?.[0]?.trim();
