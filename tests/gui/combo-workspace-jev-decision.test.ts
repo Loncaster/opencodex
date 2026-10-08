@@ -167,7 +167,8 @@ describe("JEV decision service in the combo workspace", () => {
     }
     for (const url of ["http://decisions.example/v1/systemone", "http://10.example.com/v1/systemone", "ftp://decisions.example/v1/systemone", "https://user:pass@example.test/v1/decisions", "https://decisions.example/v1/decisions?key=secret", "https://decisions.example/v1/decisions#fragment",
       "https://decisions.example/v1/decisions?", "https://decisions.example/v1/decisions#", "https://decisions.example/v1/decisions?#",
-      "https://@decisions.example/v1/decisions", "https://:@decisions.example/v1/decisions"]) {
+      "https://@decisions.example/v1/decisions", "https://:@decisions.example/v1/decisions",
+      "https:\t//@decisions.example/v1/decisions", "https:\n//:@decisions.example/v1/decisions", "https://decisions.example/v1/de\rcisions"]) {
       expect(isSystemOneEndpoint(url)).toBeFalse();
     }
     expect(isSystemOneEndpoint("https://decisions.example/v1/user@decisions")).toBeTrue();

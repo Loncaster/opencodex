@@ -119,6 +119,18 @@ describe("JEV decision destination credential ownership", () => {
     expect(calls.map(call => call.url)).toEqual([expected]);
   });
 
+  test.each(["https:\t//@decider.example/v1/decisions", "https://decider.example/v1/decisions?", "https://:@decider.example/v1/decisions"])(
+    "baseUrl %j with a stripped delimiter never sends",
+    async (baseUrl) => {
+      const { calls, post } = recordingPost();
+      expect(await resolveJevDecision({
+        body: { input: "Choose a target." }, candidates, fallback,
+        config: configWith("custom-decider", { ...customRow, baseUrl }), decisionProvider: "custom-decider", post,
+      })).toMatchObject({ ...fallback, gate: "missing_key" });
+      expect(calls).toHaveLength(0);
+    },
+  );
+
   test("a custom HTTPS path preserves caller cancellation by identity", async () => {
     const controller = new AbortController();
     const reason = new DOMException("caller stopped", "AbortError");
